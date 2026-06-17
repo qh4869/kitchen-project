@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
-from app.routers import purchases, suppliers, uploads
+from app.routers import ocr, purchases, suppliers, uploads
 
 
 @asynccontextmanager
@@ -35,6 +35,7 @@ api_prefix = "/api/v1"
 app.include_router(suppliers.router, prefix=api_prefix)
 app.include_router(purchases.router, prefix=api_prefix)
 app.include_router(uploads.router, prefix=api_prefix)
+app.include_router(ocr.router, prefix=api_prefix)
 
 # Serve uploaded receipt images. In production, swap to S3/OSS via STORAGE_DRIVER.
 app.mount("/static", StaticFiles(directory=str(settings.upload_path)), name="static")
