@@ -1,0 +1,22 @@
+{
+  "name": "kitchen-project",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:api": "cd apps/api && python -m uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 3000",
+    "dev:web": "pnpm --filter @kitchen/web dev",
+    "build:web": "pnpm --filter @kitchen/web build",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:migrate": "cd apps/api && python -m uv run alembic upgrade head",
+    "db:revision": "cd apps/api && python -m uv run alembic revision --autogenerate -m",
+    "gen:types": "bash scripts/gen-api-types.sh",
+    "test:api": "cd apps/api && python -m uv run pytest"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "openapi-typescript": "^7.4.4"
+  },
+  "packageManager": "pnpm@11.7.0"
+}

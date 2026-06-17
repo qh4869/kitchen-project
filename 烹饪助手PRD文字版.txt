@@ -1,0 +1,469 @@
+连续烹饪助手产品需求文档（PRD）
+1. 文档概述
+1.1 项目名称
+连续烹饪助手（Continuous Cooking Assistant）
+1.2 文档目的
+本文档旨在定义"连续烹饪助手"Web应用的产品需求，为开发团队提供详细的功能规格和设计指导。
+1.3 项目背景
+解决家庭烹饪中"采购成本高"和"多菜品制作流程混乱"的痛点，通过智能化采购和工业化烹饪编排提升烹饪效率。
+2. 用户画像（Persona）
+2.1 核心用户群体
+用户画像A：忙碌的职场父母
+•年龄：30-45岁
+•职业：企业职员/管理者
+•痛点：工作繁忙，时间紧张，需要高效完成家庭烹饪
+•需求：快速规划多菜品制作流程，节省采购和烹饪时间
+用户画像B：烹饪爱好者
+•年龄：25-40岁
+•职业：自由职业者/创意工作者
+•痛点：喜欢尝试复杂菜谱，但多菜品制作流程混乱
+•需求：智能化的烹饪工序编排，优化烹饪体验
+用户画像C：精打细算的家庭主妇/主夫
+•年龄：35-55岁
+•职业：全职家庭主妇/主夫
+•痛点：采购成本控制困难，缺乏系统的价格比较工具
+•需求：智能比价和采购优化工具
+3. 核心业务流程图（User Flow）
+3.1 整体业务流程
+用户登录 → 选择功能模块（采购/烹饪） → 执行核心操作 → 查看结果 → 反馈优化
+3.2 采购模块流程
+拍照识别小票/价签 → OCR提取信息 → 人工微调 → 存储到供应商数据库 → 生成价格仪表盘
+3.3 烹饪编排模块流程
+输入菜谱来源 → LLM解析菜谱 → 工序智能拆解 → 物料聚合 → 硬件配置识别 → 并行排程 → 生成甘特图 → 执行导航
+3.4 烹饪执行流程
+进入烹饪模式 → 大字体步骤导航 → 语音提醒关键节点 → 用户标记完成状态 → 动态调整时间轴
+4. 功能详解（Features Breakdown）
+4.1 智慧采购模块（Procurement）
+4.1.1 视觉化记账
+•支持拍照上传小票/货架价签照片
+•集成OCR技术提取商品名、单价、数量信息
+•提供人工微调界面修正识别错误
+•自动关联供应商信息
+4.1.2 供应商管理
+•记录供应商基本信息（名称、位置、联系方式）
+•管理供应商营业时间
+•设置个人偏好标签（如：海鲜新鲜、蔬菜便宜）
+•收集历史采购数据用于价格分析
+4.1.3 价格仪表盘
+•单品历史价格波动曲线展示
+•同品类不同店铺价格横向对比
+•智能推荐购买店铺
+•价格趋势预测功能
+4.2 连续烹饪编排模块（Cooking Orchestration）
+4.2.1 菜谱抓取与结构化
+•支持URL输入抓取菜谱（小红书、下厨房等）
+•支持文字描述输入
+•LLM解析非结构化文本
+•自动拆解为标准工序
+4.2.2 智能时间分层
+•提前准备层：解冻、泡发等超长耗时任务
+•集中处理层：洗、切、分装、腌制等可聚合任务
+•即时烹饪层：开火烹饪、兑料碗等即时操作
+4.2.3 智能聚合与排程
+•物料聚合引擎：自动识别共用食材并合并处理任务
+•硬件配置识别：单灶/双灶/多灶及电器配置识别
+•并行策略优化：无需看管任务与需要盯守任务重叠规划
+•集中前置策略：清洗切配环节集中处理
+4.2.4 甘特图视图
+•可视化烹饪时间轴展示
+•不同颜色区分任务类型
+•支持时间轴缩放查看
+•交互式任务调整
+4.2.5 执行模式
+•大字体步骤导航界面
+•语音播报关键节点提醒
+•实时状态标记（已完成/跳过）
+•动态时间轴调整
+4.3 系统设置与管理
+4.3.1 用户配置
+•个人偏好设置
+•硬件设备配置
+•通知设置管理
+4.3.2 数据管理
+•历史数据备份与恢复
+•数据导出功能
+•隐私设置管理
+5. 数据结构定义（Key Data Models）
+5.1 用户数据模型
+interface User {
+  id: string;
+  username: string;
+  email: string;
+  preferences: {
+    cooking_style: string[];
+    dietary_restrictions: string[];
+    spice_tolerance: number;
+  };
+  hardware_config: {
+    stove_count: number;
+    appliances: string[]; // ['rice_cooker', 'air_fryer', 'oven']
+  };
+}
+5.2 供应商数据模型
+interface Supplier {
+  id: string;
+  name: string;
+  location: {
+    address: string;
+    latitude: number;
+    longitude: number;
+  };
+  business_hours: string[];
+  preferences: string[]; // ['fresh_seafood', 'cheap_vegetables']
+  contact_info: string;
+}
+5.3 采购记录数据模型
+interface PurchaseRecord {
+  id: string;
+  user_id: string;
+  supplier_id: string;
+  items: PurchaseItem[];
+  total_amount: number;
+  purchase_time: Date;
+  receipt_image: string; // 存储图片URL
+  manual_adjustment: boolean;
+}
+
+interface PurchaseItem {
+  name: string;
+  quantity: number;
+  unit_price: number;
+  category: string;
+  brand: string;
+}
+5.4 菜谱数据模型
+interface Recipe {
+  id: string;
+  title: string;
+  source_url: string;
+  ingredients: RecipeIngredient[];
+  steps: RecipeStep[];
+  cooking_time: number;
+  difficulty: string;
+  tags: string[];
+}
+
+interface RecipeIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+  preparation: string; // 'minced', 'sliced', 'diced'
+}
+
+interface RecipeStep {
+  step_number: number;
+  description: string;
+  required_time: number;
+  tools_needed: string[];
+}
+5.5 烹饪计划数据模型
+interface CookingPlan {
+  id: string;
+  user_id: string;
+  recipes: string[]; // 关联的菜谱ID数组
+  tasks: CookingTask[];
+  schedule: ScheduleItem[];
+  created_at: Date;
+  status: 'planned' | 'in_progress' | 'completed';
+}
+
+interface CookingTask {
+  id: string;
+  type: 'prep' | 'cook' | 'appliance';
+  name: string;
+  description: string;
+  ingredients: TaskIngredient[];
+  dependencies: string[]; // 依赖的其他任务ID
+  estimated_time: number;
+  actual_time?: number;
+  status: 'pending' | 'in_progress' | 'completed' | 'skipped';
+}
+
+interface TaskIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+  preparation: string;
+}
+
+interface ScheduleItem {
+  task_id: string;
+  start_time: number; // 相对时间，分钟
+  end_time: number;
+  resource: string; // 'stove_1', 'stove_2', 'rice_cooker'
+}
+6. 多菜谱并行编排算法逻辑
+6.1 算法设计目标
+•实现多菜品制作流程的智能编排
+•最大化物料处理聚合
+•优化硬件资源并行使用
+•无需用户手动输入时间数据
+6.2 核心算法伪代码
+def generate_cooking_schedule(recipes: List[Recipe], hardware_config: HardwareConfig) -> CookingPlan:
+    """
+    生成多菜品烹饪时间轴
+    """
+    # 步骤1: 菜谱解析与工序标准化
+    all_tasks = []
+    for recipe in recipes:
+        recipe_tasks = parse_recipe_to_tasks(recipe)
+        all_tasks.extend(recipe_tasks)
+    
+    # 步骤2: 物料聚合处理
+    aggregated_tasks = aggregate_materials(all_tasks)
+    
+    # 步骤3: 任务依赖分析
+    task_dependencies = analyze_dependencies(aggregated_tasks)
+    
+    # 步骤4: 硬件资源分配
+    resource_allocation = allocate_resources(aggregated_tasks, hardware_config)
+    
+    # 步骤5: 并行调度优化
+    schedule = optimize_parallel_schedule(aggregated_tasks, task_dependencies, resource_allocation)
+    
+    # 步骤6: 生成甘特图数据
+    gantt_chart = generate_gantt_chart(schedule)
+    
+    return CookingPlan(
+        tasks=aggregated_tasks,
+        schedule=schedule,
+        gantt_chart=gantt_chart
+    )
+
+def aggregate_materials(tasks: List[CookingTask]) -> List[CookingTask]:
+    """
+    物料聚合算法
+    """
+    # 按食材名称和处理方式分组
+    material_groups = {}
+    for task in tasks:
+        if task.type == 'prep':
+            key = f"{task.ingredient.name}_{task.ingredient.preparation}"
+            if key not in material_groups:
+                material_groups[key] = []
+            material_groups[key].append(task)
+    
+    # 合并相同物料处理任务
+    aggregated_tasks = []
+    for key, group_tasks in material_groups.items():
+        if len(group_tasks) > 1:
+            # 合并为一个任务，增加处理量
+            merged_task = merge_tasks(group_tasks)
+            aggregated_tasks.append(merged_task)
+        else:
+            aggregated_tasks.append(group_tasks[0])
+    
+    return aggregated_tasks
+
+def optimize_parallel_schedule(tasks: List[CookingTask], 
+                              dependencies: Dict[str, List[str]], 
+                              resources: Dict[str, List[str]]) -> List[ScheduleItem]:
+    """
+    并行调度优化算法
+    """
+    # 初始化时间轴
+    timeline = []
+    current_time = 0
+    
+    # 按任务优先级排序（依赖少的优先）
+    sorted_tasks = sort_by_dependency_priority(tasks, dependencies)
+    
+    # 任务调度循环
+    for task in sorted_tasks:
+        # 查找可用资源
+        available_resource = find_available_resource(task, resources, timeline, current_time)
+        
+        if available_resource:
+            # 分配资源并安排时间
+            schedule_item = ScheduleItem(
+                task_id=task.id,
+                start_time=current_time,
+                end_time=current_time + task.estimated_time,
+                resource=available_resource
+            )
+            timeline.append(schedule_item)
+            current_time = max(current_time, schedule_item.end_time)
+        else:
+            # 资源冲突，需要等待
+            wait_time = find_next_available_time(task, resources, timeline)
+            current_time += wait_time
+            schedule_item = ScheduleItem(
+                task_id=task.id,
+                start_time=current_time,
+                end_time=current_time + task.estimated_time,
+                resource=find_available_resource(task, resources, timeline, current_time)
+            )
+            timeline.append(schedule_item)
+            current_time = schedule_item.end_time
+    
+    return timeline
+
+def find_available_resource(task: CookingTask, 
+                           resources: Dict[str, List[str]], 
+                           timeline: List[ScheduleItem], 
+                           current_time: int) -> str:
+    """
+    查找可用硬件资源
+    """
+    # 根据任务类型查找可用资源
+    if task.type == 'cook':
+        stove_resources = resources.get('stoves', [])
+        for stove in stove_resources:
+            if is_resource_available(stove, timeline, current_time, current_time + task.estimated_time):
+                return stove
+    elif task.type == 'appliance':
+        appliance_resources = resources.get('appliances', [])
+        for appliance in appliance_resources:
+            if is_resource_available(appliance, timeline, current_time, current_time + task.estimated_time):
+                return appliance
+    else:  # prep tasks can use any available resource
+        all_resources = stove_resources + appliance_resources
+        for resource in all_resources:
+            if is_resource_available(resource, timeline, current_time, current_time + task.estimated_time):
+                return resource
+    
+    return None
+6.3 时间估算策略
+6.3.1 基于机器学习的时间估算
+def estimate_task_time(task: CookingTask) -> int:
+    """
+    任务耗时估算
+    """
+    # 基于历史数据训练的估算模型
+    base_time = get_base_time_for_task_type(task.type, task.name)
+    
+    # 考虑食材处理量的影响
+    quantity_factor = calculate_quantity_factor(task.ingredients)
+    
+    # 考虑用户熟练度
+    skill_factor = get_user_skill_factor(task.user_id)
+    
+    # 最终估算时间
+    estimated_time = base_time * quantity_factor * skill_factor
+    
+    return round(estimated_time)
+6.3.2 冲突检测机制
+def detect_schedule_conflicts(schedule: List[ScheduleItem]) -> List[Conflict]:
+    """
+    检测时间轴冲突
+    """
+    conflicts = []
+    
+    # 检查资源冲突
+    for i in range(len(schedule)):
+        for j in range(i + 1, len(schedule)):
+            if schedule[i].resource == schedule[j].resource:
+                if has_time_overlap(schedule[i], schedule[j]):
+                    conflicts.append(Conflict(
+                        type='resource_conflict',
+                        tasks=[schedule[i].task_id, schedule[j].task_id],
+                        resource=schedule[i].resource
+                    ))
+    
+    # 检查依赖冲突
+    for task in schedule:
+        dependencies = get_task_dependencies(task.task_id)
+        for dep in dependencies:
+            dep_schedule = find_schedule_item(dep, schedule)
+            if dep_schedule and dep_schedule.end_time > task.start_time:
+                conflicts.append(Conflict(
+                    type='dependency_conflict',
+                    tasks=[dep, task.task_id]
+                ))
+    
+    return conflicts
+7. 非功能需求
+7.1 性能需求
+•页面加载时间 ≤ 2秒
+•烹饪计划生成时间 ≤ 5秒
+•支持同时处理5个以上菜谱的编排
+7.2 可用性需求
+•支持移动端和桌面端自适应
+•大字体模式支持
+•语音交互支持
+•低学习成本，30分钟内可上手使用
+7.3 安全性需求
+•用户数据加密存储
+•采购记录隐私保护
+•符合GDPR数据保护要求
+7.4 可扩展性需求
+•支持第三方菜谱平台接入
+•支持多种OCR服务切换
+•支持多语言界面
+8. 技术架构设计
+8.1 前端架构
+•框架：React + TypeScript + TailwindCSS
+•状态管理：Redux Toolkit
+•UI组件库：Material-UI + Custom Components
+•可视化：D3.js for Gantt Chart
+8.2 后端架构
+•主框架：Node.js (Express)
+•AI服务：Python (FastAPI)
+•数据库：PostgreSQL + Redis
+•文件存储：AWS S3 / 阿里云OSS
+8.3 AI服务架构
+•OCR服务：支持多模态大模型（GPT-4V, Gemini, Qwen-VL）
+•菜谱解析：LLM API集成（OpenAI, Anthropic, 国产大模型）
+•时间估算：机器学习模型（基于历史数据训练）
+8.4 部署架构
+•云服务器：AWS EC2 / 阿里云ECS
+•容器化：Docker + Kubernetes
+•CI/CD：GitHub Actions + ArgoCD
+•监控：Prometheus + Grafana
+9. 项目里程碑计划
+9.1 第一阶段（1-3个月）
+•完成基础架构搭建
+•实现智慧采购核心功能
+•开发单菜谱解析与展示
+9.2 第二阶段（4-6个月）
+•完成多菜谱并行编排算法
+•实现甘特图可视化
+•开发烹饪执行模式
+9.3 第三阶段（7-9个月）
+•优化AI解析准确率
+•完善移动端体验
+•上线测试版本
+9.4 第四阶段（10-12个月）
+•全面功能测试
+•用户体验优化
+•正式版本发布
+10. 风险评估与应对
+10.1 技术风险
+•AI解析准确率不足：采用多模型融合策略，提供人工修正入口
+•并行算法复杂度高：分阶段实现，先保证基础功能再优化
+•硬件配置识别困难：提供详细的配置向导和示例
+10.2 市场风险
+•用户接受度不确定：通过MVP验证核心价值，逐步迭代
+•竞品模仿：建立技术壁垒，持续创新
+•商业模式不清晰：探索多种变现方式（订阅制、增值服务）
+10.3 运营风险
+•数据积累需要时间：提供初始数据包，加速冷启动
+•用户教育成本高：制作详细的教程和引导流程
+•技术支持压力大：建立完善的帮助文档和客服体系
+11. 成功指标定义
+11.1 产品指标
+•用户注册转化率 ≥ 30%
+•日活跃用户 ≥ 10,000
+•平均使用时长 ≥ 15分钟/次
+•功能使用率 ≥ 70%
+11.2 商业指标
+•付费用户转化率 ≥ 15%
+•客单价 ≥ $5/月
+•用户留存率 ≥ 40%（30天）
+11.3 技术指标
+•系统可用性 ≥ 99.9%
+•API响应时间 ≤ 500ms
+•数据处理准确率 ≥ 90%
+12. 附录
+12.1 术语表
+•物料聚合：将多个菜品中相同的食材处理步骤合并为一次操作
+•工序拆解：将烹饪过程分解为标准化的任务单元
+•并行调度：合理安排多个任务在同一时间段内执行
+12.2 参考资料
+•项目管理甘特图原理
+•工业化生产流程优化理论
+•人工智能在生活服务领域的应用案例
+文档版本：v1.0
+编写日期：2024年
+编写人：产品团队
+(AI生成)
