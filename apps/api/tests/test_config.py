@@ -1,7 +1,9 @@
 from app.config import Settings
 
 
-def test_settings_default_provider_is_volcengine(monkeypatch):
+def test_settings_default_provider_is_volcengine(monkeypatch, tmp_path):
+    # Run from an empty dir so neither ./apps/api/.env nor ./.env is picked up.
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("OCR_PROVIDER", raising=False)
     s = Settings()
     assert s.ocr_provider == "volcengine"

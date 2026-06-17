@@ -6,7 +6,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # Look in the cwd (apps/api when running via pnpm dev:api) first, then
+        # fall back to the project-root .env so a single file works for both
+        # uvicorn launched from apps/api and tools run from the repo root.
+        env_file=(".env", "../../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
