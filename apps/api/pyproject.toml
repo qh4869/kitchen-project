@@ -39,6 +39,9 @@ packages = ["app"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "integration: hits real LLM API; skipped unless -m integration is passed",
+]
 
 [tool.ruff]
 line-length = 100
