@@ -7,13 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.models import Purchase, PurchaseItem
-from app.deps import get_db
+from app.deps import get_db, get_storage
+from app.config import settings
+from app.schemas.ocr import PurchaseFromOcrRequest
 from app.schemas.purchase import (
     PurchaseCreate,
     PurchaseListItem,
     PurchaseOut,
     PurchaseUpdate,
 )
+from app.services.storage.adapter import FileStorage
 
 router = APIRouter(prefix="/purchases", tags=["purchases"])
 
@@ -77,6 +80,38 @@ async def create_purchase(
     db.add(purchase)
     await db.commit()
     # Reload with items to populate response
+    refreshed = await db.get(
+        Purchase, purchase.id, options=[selectinload(Purchase.items)]
+    )
+    assert refreshed is not None
+    return refreshed
+
+
+@router.post("/from-ocr", response_model=PurchaseOut, status_code=status.HTTP_201_CREATED)
+async def create_purchase_from_ocr(
+    payload: PurchaseFromOcrRequest,
+    db: AsyncSession = Depends(get_db),
+    storage: FileStorage = Depends(get_storage),
+) -> Purchase:
+    # Verify image exists
+    try:
+        await storage.read(payload.image_key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="IMAGE_NOT_FOUND") from None
+
+    purchase = Purchase(
+        supplier_id=payload.supplier_id,
+        total_amount=payload.total_amount,
+        purchase_time=payload.purchase_time,
+        notes=payload.notes,
+        receipt_image_path=payload.image_key,
+        ocr_raw=payload.ocr_raw,
+        ocr_provider=settings.ocr_provider,
+        manual_adjustment=payload.manual_adjustment,
+        items=[PurchaseItem(**item.model_dump()) for item in payload.items],
+    )
+    db.add(purchase)
+    await db.commit()
     refreshed = await db.get(
         Purchase, purchase.id, options=[selectinload(Purchase.items)]
     )
