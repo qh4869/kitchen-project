@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,11 +13,17 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://kitchen:kitchen@localhost:5432/kitchen"
 
-    ocr_provider: str = "glm"
-    glm_api_key: str = ""
-    glm_model: str = "glm-4v"
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o"
+    # LLM (OpenAI-compatible; default points at 火山方舟 Ark)
+    ocr_provider: str = "volcengine"          # volcengine | openai | mock
+    llm_base_url: str = "https://ark.cn-beijing.volces.com/api/v3"
+    # Accepts either LLM_API_KEY (in .env) or ARK_API_KEY_KITCHEN (shell env, preferred for secrets)
+    llm_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("LLM_API_KEY", "ARK_API_KEY_KITCHEN"),
+    )
+    llm_model: str = "Doubao-Seed-2.0-mini"
+    llm_force_json: bool = True
+    ocr_mock_fixture: str = ""                # path to JSON fixture for MockOcrAdapter
 
     storage_driver: str = "local"
     upload_dir: str = "./uploads"
