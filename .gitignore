@@ -26,6 +26,9 @@ pnpm-debug.log*
 # Vite
 .vite/
 
+# TypeScript incremental build cache
+*.tsbuildinfo
+
 # Env / secrets
 .env
 .env.local
@@ -40,6 +43,9 @@ uploads/
 .idea/
 *.swp
 *.swo
+
+# Claude Code local settings (per-machine overrides; do not share)
+.claude/settings.local.json
 
 # OS
 .DS_Store
