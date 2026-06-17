@@ -268,7 +268,7 @@ export default function UploadPage() {
 
 function ocrErrorText(e: ApiError): string {
   if (e.status === 504 && e.detail.includes("OCR_TIMEOUT")) {
-    return "OCR 超时（10s），请重试或换一张清晰的图";
+    return "OCR 超时（30s），请重试或换一张清晰的图";
   }
   if (e.detail.includes("OCR_PARSE_ERROR")) {
     return "OCR 服务异常（结果解析失败），请稍后再试";

@@ -6,11 +6,11 @@ To run:
   3. pytest -m integration tests/integration/test_ocr_real.py -v
 """
 
-import os
 from pathlib import Path
 
 import pytest
 
+from app.config import settings
 from app.services.ocr.adapter import create_ocr_adapter
 from app.services.storage.image import preprocess_image
 
@@ -19,8 +19,10 @@ FIXTURE = Path(__file__).parent.parent / "fixtures" / "receipt_sample.jpg"
 
 @pytest.mark.integration
 async def test_real_ocr_returns_at_least_one_item():
-    if not (os.environ.get("LLM_API_KEY") or os.environ.get("ARK_API_KEY_KITCHEN")):
-        pytest.skip("LLM_API_KEY or ARK_API_KEY_KITCHEN not set")
+    # Read via settings so the .env file (loaded by pydantic-settings) is honored.
+    # os.environ alone would miss keys only present in .env.
+    if not settings.llm_api_key:
+        pytest.skip("LLM_API_KEY (or ARK_API_KEY_KITCHEN) not set in env or .env")
     if not FIXTURE.exists():
         pytest.skip(f"put a real receipt photo at {FIXTURE}")
 

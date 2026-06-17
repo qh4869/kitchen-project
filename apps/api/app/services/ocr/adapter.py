@@ -29,7 +29,7 @@ def create_ocr_adapter() -> OcrAdapter:
             api_key=settings.llm_api_key,
             model=settings.llm_model,
             provider_name=name,
-            timeout=10,
+            timeout=30,
             force_json=settings.llm_force_json,
         )
     raise ValueError(f"Unknown OCR_PROVIDER: {name!r}")
