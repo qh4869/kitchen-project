@@ -7,7 +7,8 @@
 - **后端**：Python 3.13 + FastAPI + SQLAlchemy 2.0 (async) + asyncpg + Alembic
 - **前端**：React 18 + Vite + TypeScript + TailwindCSS + TanStack Query
 - **数据库**：PostgreSQL 16（Docker）
-- **OCR**：可插拔适配器，默认 GLM-4V
+- **OCR**：可插拔适配器，默认 Volcengine Ark Doubao-Seed-2.0-mini（OpenAI 兼容协议，可切 OpenAI / Qwen / Deepseek；本地开发可用 `mock` provider 免 key）
+- **图像处理**：Pillow + pillow-heif（HEIC 解码、EXIF 旋转、长边 ≤2000px 压缩、JPEG q85）
 - **包管理**：uv（Python）/ pnpm（前端 monorepo）
 - **类型同步**：FastAPI 自动产出 OpenAPI → `openapi-typescript` 生成 TS 类型
 
@@ -26,12 +27,23 @@ kitchen-project/
 └── .env.example
 ```
 
+## 功能概览
+
+| 模块 | 状态 | 说明 |
+|---|---|---|
+| 供应商管理（CRUD） | ✅ | 线下菜场 / 超市维护 |
+| 采购记录（CRUD） | ✅ | 手工录入或 OCR 落库 |
+| 拍照记账（OCR） | ✅ | 上传小票 / 价签 / 菜摊照片 → LLM 识别 → 人工微调 → 保存 |
+| 价格仪表盘 | 🚧 | Phase 3 |
+
+**OCR 流程**：浏览器上传图片 → `/uploads` Pillow 预处理（HEIC 解码 / EXIF 旋转 / 压缩）→ `/ocr/extract` 调用 LLM 提取商品明细（30s 超时）→ 前端可编辑 → `/purchases/from-ocr` 落库。识别对象支持采购小票、单品价签、菜摊 / 货架陈列照、冷柜分类牌。
+
 ## 快速开始
 
 ### 首次初始化
 
 ```bash
-# 1. 复制环境变量并填入 GLM_API_KEY
+# 1. 复制环境变量；按需填 LLM_API_KEY（或用 OCR_PROVIDER=mock 免 key 跑）
 cp .env.example .env
 
 # 2. 启动 PostgreSQL
@@ -82,7 +94,7 @@ pnpm dev             # 同时启动前后端：api:3000 / web:5173
 只需修改 `.env`：
 - `DATABASE_URL` → 远程 PG
 - `STORAGE_DRIVER=s3` + 对象存储凭证（S3/OSS 兼容）
-- `OCR_*` 不变（OCR 是第三方 API，与部署位置无关）
+- `LLM_*` 不变（OCR 是第三方 API，与部署位置无关）
 
 前端 `pnpm build:web` 后产物为静态资源，可放任意 CDN / nginx。后端用 `uvicorn app.main:app --workers 4`（生产推荐 gunicorn + uvicorn worker）。
 
