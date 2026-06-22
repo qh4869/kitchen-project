@@ -101,7 +101,7 @@ export default function DashboardPage() {
 
       {phase === "empty" && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          未找到 &ldquo;{submittedQ}&rdquo; 的采购记录。可以换个关键词，或先去「拍照记账」/「采购记录」录入。
+          未找到 &ldquo;{submittedQ}&rdquo; 的采购记录。可以换个关键词，或先去「记账」/「采购记录」录入。
         </div>
       )}
 
