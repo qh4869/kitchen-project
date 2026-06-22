@@ -79,7 +79,6 @@ export default function EntryPage() {
   const [manualPurchaseTime, setManualPurchaseTime] = useState<string>(nowLocalDateTime());
   const [manualTotalAmount, setManualTotalAmount] = useState<string>("");
   const [manualItems, setManualItems] = useState<Item[]>([{ ...EMPTY_ITEM }]);
-  const [manualDirty, setManualDirty] = useState(false);
 
   const { data: suppliers } = useQuery<Supplier[]>({
     queryKey: ["suppliers"],
@@ -194,7 +193,6 @@ export default function EntryPage() {
     setManualPurchaseTime(nowLocalDateTime());
     setManualTotalAmount("");
     setManualItems([{ ...EMPTY_ITEM }]);
-    setManualDirty(false);
   };
 
   const switchMode = (next: Mode) => {
@@ -382,7 +380,9 @@ export default function EntryPage() {
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   className="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                  onClick={() => photoSaveMut.mutate()}
+                  onClick={() => {
+                    if (!photoSaveMut.isPending) photoSaveMut.mutate();
+                  }}
                   disabled={
                     photoSaveMut.isPending ||
                     photoItems.filter((i) => i.name && i.unit_price).length === 0
@@ -421,7 +421,6 @@ export default function EntryPage() {
                     value={manualSupplierId}
                     onChange={(e) => {
                       setManualSupplierId(e.target.value);
-                      setManualDirty(true);
                     }}
                   >
                     <option value="">— 不选 —</option>
@@ -440,7 +439,6 @@ export default function EntryPage() {
                     value={manualPurchaseTime}
                     onChange={(e) => {
                       setManualPurchaseTime(e.target.value);
-                      setManualDirty(true);
                     }}
                   />
                 </label>
@@ -453,7 +451,6 @@ export default function EntryPage() {
                     value={manualTotalAmount}
                     onChange={(e) => {
                       setManualTotalAmount(e.target.value);
-                      setManualDirty(true);
                     }}
                   />
                 </label>
@@ -463,7 +460,6 @@ export default function EntryPage() {
                 items={manualItems}
                 onChange={(next) => {
                   setManualItems(next);
-                  setManualDirty(true);
                 }}
               />
 
