@@ -4,6 +4,8 @@ import { api, ApiError } from "../api/client";
 import ImageUploader from "../components/ImageUploader";
 import ItemEditor, { type Item } from "../components/ItemEditor";
 
+type Mode = "photo" | "manual";
+
 type Supplier = { id: string; name: string };
 type OcrItem = {
   name: string;
@@ -23,7 +25,8 @@ type OcrResult = {
   provider: string;
 };
 
-type Phase = "idle" | "uploaded" | "recognizing" | "recognized" | "failed" | "saving" | "saved";
+type PhotoPhase = "idle" | "uploaded" | "recognizing" | "recognized" | "failed" | "saving" | "saved";
+type ManualPhase = "idle" | "saving" | "saved" | "error";
 
 const num = (v: unknown): string =>
   v === null || v === undefined || v === "" ? "" : String(v);
@@ -37,59 +40,87 @@ const itemFromOcr = (it: OcrItem): Item => ({
   brand: it.brand ?? "",
 });
 
+function nowLocalDateTime(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const EMPTY_ITEM: Item = {
+  name: "",
+  quantity: "1",
+  unit: "",
+  unit_price: "",
+  category: "",
+  brand: "",
+};
+
 export default function EntryPage() {
   const qc = useQueryClient();
-  const [phase, setPhase] = useState<Phase>("idle");
+
+  // --- Mode (segmented control) ---
+  const [mode, setMode] = useState<Mode>("photo");
+
+  // --- Photo mode state (unchanged from original UploadPage) ---
+  const [photoPhase, setPhotoPhase] = useState<PhotoPhase>("idle");
   const [imageKey, setImageKey] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [photoErrorMsg, setPhotoErrorMsg] = useState<string | null>(null);
 
-  const [supplierId, setSupplierId] = useState<string>("");
-  const [purchaseTime, setPurchaseTime] = useState<string>("");
-  const [totalAmount, setTotalAmount] = useState<string>("");
-  const [items, setItems] = useState<Item[]>([]);
-  const [rawLlm, setRawLlm] = useState<Record<string, unknown>>({});
-  const [dirty, setDirty] = useState(false);
+  const [photoSupplierId, setPhotoSupplierId] = useState<string>("");
+  const [photoPurchaseTime, setPhotoPurchaseTime] = useState<string>("");
+  const [photoTotalAmount, setPhotoTotalAmount] = useState<string>("");
+  const [photoItems, setPhotoItems] = useState<Item[]>([]);
+  const [photoRawLlm, setPhotoRawLlm] = useState<Record<string, unknown>>({});
+  const [photoDirty, setPhotoDirty] = useState(false);
+
+  // --- Manual mode state (new) ---
+  const [manualSupplierId, setManualSupplierId] = useState<string>("");
+  const [manualPurchaseTime, setManualPurchaseTime] = useState<string>(nowLocalDateTime());
+  const [manualTotalAmount, setManualTotalAmount] = useState<string>("");
+  const [manualItems, setManualItems] = useState<Item[]>([{ ...EMPTY_ITEM }]);
+  const [manualDirty, setManualDirty] = useState(false);
 
   const { data: suppliers } = useQuery<Supplier[]>({
     queryKey: ["suppliers"],
     queryFn: () => api.get<Supplier[]>("/api/v1/suppliers"),
   });
 
+  // --- Photo mode mutations (unchanged) ---
   const ocrMut = useMutation({
     mutationFn: async (key: string) =>
       api.post<OcrResult>("/api/v1/ocr/extract", { image_key: key }),
     onMutate: () => {
-      setPhase("recognizing");
-      setErrorMsg(null);
+      setPhotoPhase("recognizing");
+      setPhotoErrorMsg(null);
     },
     onSuccess: (r) => {
       setImageKey(r.image_key);
-      setRawLlm(r.raw_llm_output);
-      setItems(r.items.map(itemFromOcr));
-      setTotalAmount(num(r.total_amount));
-      setPhase("recognized");
+      setPhotoRawLlm(r.raw_llm_output);
+      setPhotoItems(r.items.map(itemFromOcr));
+      setPhotoTotalAmount(num(r.total_amount));
+      setPhotoPhase("recognized");
       if (r.items.length === 0) {
-        setErrorMsg("未识别到任何商品信息，请重拍或改手工录入");
-        setPhase("failed");
+        setPhotoErrorMsg("未识别到任何商品信息，请重拍或改手工录入");
+        setPhotoPhase("failed");
       }
     },
     onError: (e: ApiError) => {
-      setErrorMsg(ocrErrorText(e));
-      setPhase("failed");
+      setPhotoErrorMsg(ocrErrorText(e));
+      setPhotoPhase("failed");
     },
   });
 
-  const saveMut = useMutation({
+  const photoSaveMut = useMutation({
     mutationFn: async () => {
       const body = {
         image_key: imageKey,
-        supplier_id: supplierId || null,
-        purchase_time: purchaseTime ? new Date(purchaseTime).toISOString() : null,
-        total_amount: totalAmount || null,
-        ocr_raw: rawLlm,
-        manual_adjustment: dirty,
-        items: items
+        supplier_id: photoSupplierId || null,
+        purchase_time: photoPurchaseTime ? new Date(photoPurchaseTime).toISOString() : null,
+        total_amount: photoTotalAmount || null,
+        ocr_raw: photoRawLlm,
+        manual_adjustment: photoDirty,
+        items: photoItems
           .filter((i) => i.name.trim() && i.unit_price)
           .map((i) => ({
             name: i.name.trim(),
@@ -103,164 +134,355 @@ export default function EntryPage() {
       return api.post("/api/v1/purchases/from-ocr", body);
     },
     onMutate: () => {
-      setPhase("saving");
-      setErrorMsg(null);
+      setPhotoPhase("saving");
+      setPhotoErrorMsg(null);
     },
     onSuccess: () => {
-      setPhase("saved");
+      setPhotoPhase("saved");
       qc.invalidateQueries({ queryKey: ["purchases"] });
     },
     onError: (e: ApiError) => {
-      setErrorMsg(`保存失败：${e.detail}`);
-      setPhase("recognized");
+      setPhotoErrorMsg(`保存失败：${e.detail}`);
+      setPhotoPhase("recognized");
     },
   });
 
-  const reset = () => {
-    setPhase("idle");
+  // --- Manual mode mutation (new) ---
+  const manualSaveMut = useMutation({
+    mutationFn: async () => {
+      const body = {
+        supplier_id: manualSupplierId || null,
+        purchase_time: manualPurchaseTime
+          ? new Date(manualPurchaseTime).toISOString()
+          : null,
+        total_amount: manualTotalAmount || null,
+        items: manualItems
+          .filter((i) => i.name.trim() && i.unit_price)
+          .map((i) => ({
+            name: i.name.trim(),
+            quantity: i.quantity || "1",
+            unit: i.unit || null,
+            unit_price: i.unit_price,
+            category: i.category || null,
+            brand: i.brand || null,
+          })),
+      };
+      return api.post("/api/v1/purchases", body);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["purchases"] });
+    },
+  });
+
+  // --- Mode switching ---
+  const resetPhotoState = () => {
+    setPhotoPhase("idle");
     setImageKey(null);
     setPreviewUrl(null);
-    setErrorMsg(null);
-    setSupplierId("");
-    setPurchaseTime("");
-    setTotalAmount("");
-    setItems([]);
-    setRawLlm({});
-    setDirty(false);
+    setPhotoErrorMsg(null);
+    setPhotoSupplierId("");
+    setPhotoPurchaseTime("");
+    setPhotoTotalAmount("");
+    setPhotoItems([]);
+    setPhotoRawLlm({});
+    setPhotoDirty(false);
   };
 
-  const edit = (next: Item[]) => {
-    setItems(next);
-    setDirty(true);
+  const resetManualState = () => {
+    setManualSupplierId("");
+    setManualPurchaseTime(nowLocalDateTime());
+    setManualTotalAmount("");
+    setManualItems([{ ...EMPTY_ITEM }]);
+    setManualDirty(false);
   };
+
+  const switchMode = (next: Mode) => {
+    if (next === mode) return;
+    resetPhotoState();
+    resetManualState();
+    setMode(next);
+  };
+
+  // Manual mode phase is derived from mutation state
+  const manualPhase: ManualPhase = manualSaveMut.isPending
+    ? "saving"
+    : manualSaveMut.isSuccess
+      ? "saved"
+      : manualSaveMut.isError
+        ? "error"
+        : "idle";
+
+  const manualErrorMsg = manualSaveMut.isError
+    ? `保存失败：${(manualSaveMut.error as ApiError).detail}`
+    : null;
+
+  const manualCanSave =
+    !manualSaveMut.isPending &&
+    manualItems.filter((i) => i.name.trim() && i.unit_price).length > 0;
 
   return (
     <div className="max-w-3xl">
-      <h2 className="mb-4 text-xl font-bold">📷 拍照记账</h2>
+      <h2 className="mb-4 text-xl font-bold">记账</h2>
 
-      <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
-        {phase === "idle" ? (
-          <ImageUploader
-            onUploaded={(key, url) => {
-              setImageKey(key);
-              setPreviewUrl(url);
-              setPhase("uploaded");
-              ocrMut.mutate(key);
-            }}
-          />
-        ) : (
-          <div className="flex items-start gap-4">
-            {previewUrl && (
-              <img
-                src={previewUrl}
-                alt="预览"
-                className="h-32 rounded border border-slate-200 object-contain"
+      {/* Segmented control */}
+      <div className="mb-4 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+        <button
+          type="button"
+          onClick={() => switchMode("photo")}
+          className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
+            mode === "photo"
+              ? "bg-white text-emerald-700 font-medium shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          📷 拍照
+        </button>
+        <button
+          type="button"
+          onClick={() => switchMode("manual")}
+          className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
+            mode === "manual"
+              ? "bg-white text-emerald-700 font-medium shadow-sm"
+              : "text-slate-600 hover:text-slate-900"
+          }`}
+        >
+          ✍️ 手工
+        </button>
+      </div>
+
+      {mode === "photo" ? (
+        <>
+          {/* ============ PHOTO MODE (unchanged from original UploadPage) ============ */}
+          <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
+            {photoPhase === "idle" ? (
+              <ImageUploader
+                onUploaded={(key, url) => {
+                  setImageKey(key);
+                  setPreviewUrl(url);
+                  setPhotoPhase("uploaded");
+                  ocrMut.mutate(key);
+                }}
               />
-            )}
-            <div className="flex-1 text-sm">
-              {phase === "uploaded" && <p className="text-slate-500">准备识别…</p>}
-              {phase === "recognizing" && <p className="text-slate-500">🔍 识别中…</p>}
-              {phase === "recognized" && <p className="text-emerald-600">✓ 识别完成，可编辑后保存</p>}
-              {phase === "failed" && errorMsg && (
-                <p className="text-red-600">{errorMsg}</p>
-              )}
-              {phase === "saving" && <p className="text-slate-500">保存中…</p>}
-              {phase === "saved" && (
-                <p className="text-emerald-600">✓ 已保存，可继续上传下一张</p>
-              )}
-              <div className="mt-2 flex gap-2">
-                <button
-                  className="rounded border border-slate-300 px-3 py-1 text-xs"
-                  onClick={reset}
-                >
-                  重新上传
-                </button>
-                {phase === "failed" && (
-                  <>
-                    <button
-                      className="rounded bg-emerald-600 px-3 py-1 text-xs text-white"
-                      onClick={() => imageKey && ocrMut.mutate(imageKey)}
-                      disabled={!imageKey}
-                    >
-                      重试识别
-                    </button>
-                    <button
-                      className="rounded border border-emerald-600 px-3 py-1 text-xs text-emerald-700"
-                      onClick={() => {
-                        setPhase("recognized");
-                        setErrorMsg(null);
-                      }}
-                    >
-                      改手工录入
-                    </button>
-                  </>
+            ) : (
+              <div className="flex items-start gap-4">
+                {previewUrl && (
+                  <img
+                    src={previewUrl}
+                    alt="预览"
+                    className="h-32 rounded border border-slate-200 object-contain"
+                  />
                 )}
+                <div className="flex-1 text-sm">
+                  {photoPhase === "uploaded" && <p className="text-slate-500">准备识别…</p>}
+                  {photoPhase === "recognizing" && <p className="text-slate-500">🔍 识别中…</p>}
+                  {photoPhase === "recognized" && (
+                    <p className="text-emerald-600">✓ 识别完成，可编辑后保存</p>
+                  )}
+                  {photoPhase === "failed" && photoErrorMsg && (
+                    <p className="text-red-600">{photoErrorMsg}</p>
+                  )}
+                  {photoPhase === "saving" && <p className="text-slate-500">保存中…</p>}
+                  {photoPhase === "saved" && (
+                    <p className="text-emerald-600">✓ 已保存，可继续上传下一张</p>
+                  )}
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      className="rounded border border-slate-300 px-3 py-1 text-xs"
+                      onClick={resetPhotoState}
+                    >
+                      重新上传
+                    </button>
+                    {photoPhase === "failed" && (
+                      <>
+                        <button
+                          className="rounded bg-emerald-600 px-3 py-1 text-xs text-white"
+                          onClick={() => imageKey && ocrMut.mutate(imageKey)}
+                          disabled={!imageKey}
+                        >
+                          重试识别
+                        </button>
+                        <button
+                          className="rounded border border-emerald-600 px-3 py-1 text-xs text-emerald-700"
+                          onClick={() => {
+                            setPhotoPhase("recognized");
+                            setPhotoErrorMsg(null);
+                          }}
+                        >
+                          改手工录入
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-      </section>
+            )}
+          </section>
 
-      {(phase === "recognized" || phase === "saving" || phase === "saved") && (
-        <section className="rounded-lg border border-slate-200 bg-white p-4">
-          <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-slate-600">供应商</span>
-              <select
-                className="rounded border border-slate-300 px-2 py-1"
-                value={supplierId}
-                onChange={(e) => {
-                  setSupplierId(e.target.value);
-                  setDirty(true);
+          {(photoPhase === "recognized" ||
+            photoPhase === "saving" ||
+            photoPhase === "saved") && (
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-slate-600">供应商</span>
+                  <select
+                    className="rounded border border-slate-300 px-2 py-1"
+                    value={photoSupplierId}
+                    onChange={(e) => {
+                      setPhotoSupplierId(e.target.value);
+                      setPhotoDirty(true);
+                    }}
+                  >
+                    <option value="">— 不选 —</option>
+                    {suppliers?.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-slate-600">采购时间</span>
+                  <input
+                    type="datetime-local"
+                    className="rounded border border-slate-300 px-2 py-1"
+                    value={photoPurchaseTime}
+                    onChange={(e) => {
+                      setPhotoPurchaseTime(e.target.value);
+                      setPhotoDirty(true);
+                    }}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-slate-600">总额 (¥)</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="rounded border border-slate-300 px-2 py-1"
+                    value={photoTotalAmount}
+                    onChange={(e) => {
+                      setPhotoTotalAmount(e.target.value);
+                      setPhotoDirty(true);
+                    }}
+                  />
+                </label>
+              </div>
+
+              <ItemEditor
+                items={photoItems}
+                onChange={(next) => {
+                  setPhotoItems(next);
+                  setPhotoDirty(true);
                 }}
+              />
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  className="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                  onClick={() => photoSaveMut.mutate()}
+                  disabled={
+                    photoSaveMut.isPending ||
+                    photoItems.filter((i) => i.name && i.unit_price).length === 0
+                  }
+                >
+                  {photoSaveMut.isPending ? "保存中…" : "保存"}
+                </button>
+              </div>
+            </section>
+          )}
+        </>
+      ) : (
+        <>
+          {/* ============ MANUAL MODE (new) ============ */}
+          {manualPhase === "saved" ? (
+            <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-6 text-center">
+              <p className="text-emerald-700">✓ 已保存</p>
+              <button
+                type="button"
+                onClick={() => {
+                  manualSaveMut.reset();
+                  resetManualState();
+                }}
+                className="mt-3 rounded border border-emerald-600 px-4 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
               >
-                <option value="">— 不选 —</option>
-                {suppliers?.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-slate-600">采购时间</span>
-              <input
-                type="datetime-local"
-                className="rounded border border-slate-300 px-2 py-1"
-                value={purchaseTime}
-                onChange={(e) => {
-                  setPurchaseTime(e.target.value);
-                  setDirty(true);
+                新建一条
+              </button>
+            </section>
+          ) : (
+            <section className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-slate-600">供应商</span>
+                  <select
+                    className="rounded border border-slate-300 px-2 py-1"
+                    value={manualSupplierId}
+                    onChange={(e) => {
+                      setManualSupplierId(e.target.value);
+                      setManualDirty(true);
+                    }}
+                  >
+                    <option value="">— 不选 —</option>
+                    {suppliers?.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-slate-600">采购时间</span>
+                  <input
+                    type="datetime-local"
+                    className="rounded border border-slate-300 px-2 py-1"
+                    value={manualPurchaseTime}
+                    onChange={(e) => {
+                      setManualPurchaseTime(e.target.value);
+                      setManualDirty(true);
+                    }}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-slate-600">总额 (¥)</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="rounded border border-slate-300 px-2 py-1"
+                    value={manualTotalAmount}
+                    onChange={(e) => {
+                      setManualTotalAmount(e.target.value);
+                      setManualDirty(true);
+                    }}
+                  />
+                </label>
+              </div>
+
+              <ItemEditor
+                items={manualItems}
+                onChange={(next) => {
+                  setManualItems(next);
+                  setManualDirty(true);
                 }}
               />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-slate-600">总额 (¥)</span>
-              <input
-                type="number"
-                step="0.01"
-                className="rounded border border-slate-300 px-2 py-1"
-                value={totalAmount}
-                onChange={(e) => {
-                  setTotalAmount(e.target.value);
-                  setDirty(true);
-                }}
-              />
-            </label>
-          </div>
 
-          <ItemEditor items={items} onChange={edit} />
+              {manualErrorMsg && (
+                <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  {manualErrorMsg}
+                </div>
+              )}
 
-          <div className="mt-4 flex justify-end gap-2">
-            <button
-              className="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-              onClick={() => saveMut.mutate()}
-              disabled={saveMut.isPending || items.filter((i) => i.name && i.unit_price).length === 0}
-            >
-              {saveMut.isPending ? "保存中…" : "保存"}
-            </button>
-          </div>
-        </section>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:bg-slate-400"
+                  onClick={() => manualSaveMut.mutate()}
+                  disabled={!manualCanSave}
+                >
+                  {manualPhase === "saving" ? "保存中…" : "保存"}
+                </button>
+              </div>
+            </section>
+          )}
+        </>
       )}
     </div>
   );
