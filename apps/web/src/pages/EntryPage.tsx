@@ -124,11 +124,11 @@ export default function EntryPage() {
           .filter((i) => i.name.trim() && i.unit_price)
           .map((i) => ({
             name: i.name.trim(),
-            quantity: i.quantity || "1",
-            unit: i.unit || null,
+            quantity: (i.quantity || "1").trim() || "1",
+            unit: i.unit?.trim() || null,
             unit_price: i.unit_price,
-            category: i.category || null,
-            brand: i.brand || null,
+            category: i.category?.trim() || null,
+            brand: i.brand?.trim() || null,
           })),
       };
       return api.post("/api/v1/purchases/from-ocr", body);
@@ -160,11 +160,11 @@ export default function EntryPage() {
           .filter((i) => i.name.trim() && i.unit_price)
           .map((i) => ({
             name: i.name.trim(),
-            quantity: i.quantity || "1",
-            unit: i.unit || null,
+            quantity: (i.quantity || "1").trim() || "1",
+            unit: i.unit?.trim() || null,
             unit_price: i.unit_price,
-            category: i.category || null,
-            brand: i.brand || null,
+            category: i.category?.trim() || null,
+            brand: i.brand?.trim() || null,
           })),
       };
       return api.post("/api/v1/purchases", body);
@@ -189,6 +189,7 @@ export default function EntryPage() {
   };
 
   const resetManualState = () => {
+    manualSaveMut.reset();
     setManualSupplierId("");
     setManualPurchaseTime(nowLocalDateTime());
     setManualTotalAmount("");
@@ -213,7 +214,9 @@ export default function EntryPage() {
         : "idle";
 
   const manualErrorMsg = manualSaveMut.isError
-    ? `保存失败：${(manualSaveMut.error as ApiError).detail}`
+    ? manualSaveMut.error instanceof ApiError
+      ? `保存失败：${manualSaveMut.error.detail}`
+      : `保存失败：${(manualSaveMut.error as Error).message || "网络异常，请稍后重试"}`
     : null;
 
   const manualCanSave =
@@ -474,7 +477,9 @@ export default function EntryPage() {
                 <button
                   type="button"
                   className="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:bg-slate-400"
-                  onClick={() => manualSaveMut.mutate()}
+                  onClick={() => {
+                    if (!manualSaveMut.isPending) manualSaveMut.mutate();
+                  }}
                   disabled={!manualCanSave}
                 >
                   {manualPhase === "saving" ? "保存中…" : "保存"}
