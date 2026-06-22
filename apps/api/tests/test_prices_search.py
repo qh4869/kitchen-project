@@ -171,13 +171,15 @@ async def test_search_query_required(client):
 async def test_search_query_empty_after_strip_returns_422(client):
     r = await client.get("/api/v1/prices/search", params={"q": "   "})
     assert r.status_code == 422
-    assert "INVALID_QUERY" in r.json()["detail"]
+    assert r.json()["detail"] == "INVALID_QUERY: query must be 1-100 chars after strip"
 
 
 async def test_search_query_too_long_returns_422(client):
     r = await client.get("/api/v1/prices/search", params={"q": "x" * 101})
     assert r.status_code == 422
-    assert "INVALID_QUERY" in r.json()["detail"]
+    detail = r.json()["detail"]
+    assert detail.startswith("INVALID_QUERY: query must be 1-100 chars")
+    assert "101" in detail  # actual length is included
 
 
 async def test_search_escapes_like_wildcards(client):

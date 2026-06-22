@@ -27,12 +27,12 @@ async def search_prices(
     if not q_stripped:
         raise HTTPException(
             status_code=422,
-            detail="INVALID_QUERY: query is empty after strip",
+            detail="INVALID_QUERY: query must be 1-100 chars after strip",
         )
     if len(q_stripped) > MAX_QUERY_LENGTH:
         raise HTTPException(
             status_code=422,
-            detail=f"INVALID_QUERY: query exceeds {MAX_QUERY_LENGTH} chars",
+            detail=f"INVALID_QUERY: query must be 1-100 chars (got {len(q_stripped)})",
         )
 
     # Escape ILIKE wildcards so user input is treated literally
