@@ -77,7 +77,7 @@ export default function PurchasesPage() {
             {purchases && purchases.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
-                  暂无采购记录。点击左侧"拍照记账"添加第一条。
+                  暂无采购记录。点击左侧"记账"添加第一条。
                 </td>
               </tr>
             )}

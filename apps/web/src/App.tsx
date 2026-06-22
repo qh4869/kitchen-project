@@ -1,12 +1,12 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 import SuppliersPage from "./pages/SuppliersPage";
 import PurchasesPage from "./pages/PurchasesPage";
-import UploadPage from "./pages/UploadPage";
+import EntryPage from "./pages/EntryPage";
 import DashboardPage from "./pages/DashboardPage";
 
 const navItems = [
   { to: "/", label: "采购记录", end: true, page: "purchases" },
-  { to: "/upload", label: "拍照记账", end: false, page: "upload" },
+  { to: "/entry", label: "记账", end: false, page: "entry" },
   { to: "/suppliers", label: "供应商", end: false, page: "suppliers" },
   { to: "/dashboard", label: "价格仪表盘", end: false, page: "dashboard" },
 ];
@@ -41,7 +41,7 @@ export default function App() {
       <main className="flex-1 overflow-x-hidden p-6">
         <Routes>
           <Route path="/" element={<PurchasesPage />} />
-          <Route path="/upload" element={<UploadPage />} />
+          <Route path="/entry" element={<EntryPage />} />
           <Route path="/suppliers" element={<SuppliersPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
         </Routes>

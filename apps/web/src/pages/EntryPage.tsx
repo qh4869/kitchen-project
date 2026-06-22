@@ -37,7 +37,7 @@ const itemFromOcr = (it: OcrItem): Item => ({
   brand: it.brand ?? "",
 });
 
-export default function UploadPage() {
+export default function EntryPage() {
   const qc = useQueryClient();
   const [phase, setPhase] = useState<Phase>("idle");
   const [imageKey, setImageKey] = useState<string | null>(null);
