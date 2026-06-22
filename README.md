@@ -33,11 +33,13 @@ kitchen-project/
 |---|---|---|
 | 供应商管理（CRUD） | ✅ | 线下菜场 / 超市维护 |
 | 采购记录（CRUD） | ✅ | 手工录入或 OCR 落库 |
-| 拍照记账（OCR） | ✅ | 上传小票 / 价签 / 菜摊照片 → LLM 识别 → 人工微调 → 保存 |
+| 记账（拍照 + 手工） | ✅ | 拍照：上传小票 / 价签 → LLM 识别 → 人工微调；手工：直接填写明细 → 保存（`POST /api/v1/purchases`） |
 | 价格查询（搜索） | ✅ | 按食材名 ILIKE 子串匹配，返回最近 50 条价格 + 店铺 + 时间 |
 | 价格曲线 / 跨店比价 | 🚧 | 需先做商品名 / 单位归一化 |
 
 **OCR 流程**：浏览器上传图片 → `/uploads` Pillow 预处理（HEIC 解码 / EXIF 旋转 / 压缩）→ `/ocr/extract` 调用 LLM 提取商品明细（30s 超时）→ 前端可编辑 → `/purchases/from-ocr` 落库。识别对象支持采购小票、单品价签、菜摊 / 货架陈列照、冷柜分类牌。
+
+**手工记账**：`/entry` 页面切到 "✍️ 手工" mode → 直接填供应商 / 时间 / 总额 + 商品明细（复用 `ItemEditor`）→ `POST /api/v1/purchases` 落库。不经过 OCR，适合没拍照、记得买了什么的快速记录。
 
 **价格查询**：`/dashboard` 输入食材名（如"番茄"）→ ILIKE 子串模糊匹配 `purchase_items.name` → 表格返回最近 50 条记录，按采购时间倒序，含商品名 / 单价+单位 / 店铺 / 采购时间。未绑店铺的记录显示"—（未绑店铺）"。
 
@@ -119,7 +121,7 @@ pnpm dev             # 同时启动前后端：api:3000 / web:5173
 
 - **`datetime.utcnow()` 弃用警告**：`apps/api/app/routers/uploads.py:49` 及其测试用 `datetime.utcnow()`，Python 3.13 标记为弃用。改为 `datetime.now(datetime.UTC)`
 - **`/suppliers` 的 ILIKE 未转义**：`apps/api/app/routers/suppliers.py` 直接拼 `%{q}%`，用户输入 `%` / `_` 会被当通配符。与 `/prices/search` 的转义逻辑（`routers/prices.py:39-43`）不一致，应对齐
-- **前端手写类型 vs 生成类型**：`DashboardPage.tsx`、`UploadPage.tsx` 等手写响应类型，没用 `@kitchen/api-types`。存在漂移风险，应统一改为 `import type { paths } from "@kitchen/api-types"`
+- **前端手写类型 vs 生成类型**：`DashboardPage.tsx`、`EntryPage.tsx` 等手写响应类型，没用 `@kitchen/api-types`。存在漂移风险，应统一改为 `import type { paths } from "@kitchen/api-types"`
 - **`test_search_default_limit_50` 二级排序未验证**：60 条记录同 `purchase_time` 时，`ORDER BY` 无 tie-breaker，顺序未定义。测试只验 count，未验顺序确定性
 - **`purchase_items.name` 无 trigram 索引**：`LIKE '%foo%'` 走全表扫。家庭数据量无感，若数据量大需加 `pg_trgm` 扩展 + GIN 索引
 
