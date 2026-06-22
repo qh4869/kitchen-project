@@ -34,9 +34,12 @@ kitchen-project/
 | 供应商管理（CRUD） | ✅ | 线下菜场 / 超市维护 |
 | 采购记录（CRUD） | ✅ | 手工录入或 OCR 落库 |
 | 拍照记账（OCR） | ✅ | 上传小票 / 价签 / 菜摊照片 → LLM 识别 → 人工微调 → 保存 |
-| 价格仪表盘 | 🚧 | Phase 3 |
+| 价格查询（搜索） | ✅ | 按食材名 ILIKE 子串匹配，返回最近 50 条价格 + 店铺 + 时间 |
+| 价格曲线 / 跨店比价 | 🚧 | 需先做商品名 / 单位归一化 |
 
 **OCR 流程**：浏览器上传图片 → `/uploads` Pillow 预处理（HEIC 解码 / EXIF 旋转 / 压缩）→ `/ocr/extract` 调用 LLM 提取商品明细（30s 超时）→ 前端可编辑 → `/purchases/from-ocr` 落库。识别对象支持采购小票、单品价签、菜摊 / 货架陈列照、冷柜分类牌。
+
+**价格查询**：`/dashboard` 输入食材名（如"番茄"）→ ILIKE 子串模糊匹配 `purchase_items.name` → 表格返回最近 50 条记录，按采购时间倒序，含商品名 / 单价+单位 / 店铺 / 采购时间。未绑店铺的记录显示"—（未绑店铺）"。
 
 ## 快速开始
 
@@ -98,7 +101,29 @@ pnpm dev             # 同时启动前后端：api:3000 / web:5173
 
 前端 `pnpm build:web` 后产物为静态资源，可放任意 CDN / nginx。后端用 `uvicorn app.main:app --workers 4`（生产推荐 gunicorn + uvicorn worker）。
 
-## Feature 2 兼容
+## 待开发与遗留事项
+
+### Phase 3 v2+（价格仪表盘扩展）
+
+当前 v1 只做了 PRD §2.A 的第三件事（搜索）。剩余两件依赖**商品名归一化**（OCR 会把同一个番茄写成番茄 / 西红柿 / 番茄(有机)）和**单位归一化**（¥/kg vs ¥/500g vs ¥/个 不可比），归一化方案未定前先延后：
+
+- **单品价格曲线**：Recharts 已装但未用；需要名称归一化后按周 / 月聚合
+- **跨店铺比价**：同品类在不同店铺的当前预估价；需要单位归一化做换算
+- **推荐购买店铺**：基于"近期最低价 + 距离 / 偏好"的排序算法
+- **搜索增强**：分页、URL query state（可分享链接）、输入防抖、自动补全
+- **类型同步**：`DashboardPage.tsx` 当前手写 TS 类型，应迁到 `@kitchen/api-types` 生成产物
+
+### 已知技术债
+
+代码层面遗留，不阻塞使用但值得在下一次相关改动时顺手清理：
+
+- **`datetime.utcnow()` 弃用警告**：`apps/api/app/routers/uploads.py:49` 及其测试用 `datetime.utcnow()`，Python 3.13 标记为弃用。改为 `datetime.now(datetime.UTC)`
+- **`/suppliers` 的 ILIKE 未转义**：`apps/api/app/routers/suppliers.py` 直接拼 `%{q}%`，用户输入 `%` / `_` 会被当通配符。与 `/prices/search` 的转义逻辑（`routers/prices.py:39-43`）不一致，应对齐
+- **前端手写类型 vs 生成类型**：`DashboardPage.tsx`、`UploadPage.tsx` 等手写响应类型，没用 `@kitchen/api-types`。存在漂移风险，应统一改为 `import type { paths } from "@kitchen/api-types"`
+- **`test_search_default_limit_50` 二级排序未验证**：60 条记录同 `purchase_time` 时，`ORDER BY` 无 tie-breaker，顺序未定义。测试只验 count，未验顺序确定性
+- **`purchase_items.name` 无 trigram 索引**：`LIKE '%foo%'` 走全表扫。家庭数据量无感，若数据量大需加 `pg_trgm` 扩展 + GIN 索引
+
+### Feature 2（烹饪编排）预留
 
 本期不实现烹饪编排，但已为后续留好扩展位：
 - API 路由统一 `/api/v1` 前缀，Feature 2 加 `/api/v1/recipes`、`/api/v1/cooking-plans` 不冲突
