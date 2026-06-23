@@ -1,7 +1,8 @@
 """GET /prices/search — search purchase_items by name substring (ILIKE).
 
-Returns recent matches joined with their purchase + supplier, ordered by
-purchase_time DESC. Up to 50 rows by default.
+Empty / whitespace-only query matches all items (returns latest N
+regardless of name). Non-empty query does ILIKE substring matching
+with wildcard escaping. Ordered by purchase_time DESC, limit default 50.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,29 +20,16 @@ MAX_QUERY_LENGTH = 100
 
 @router.get("/search", response_model=SearchResult)
 async def search_prices(
-    q: str = Query(...),
+    q: str = Query(""),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
 ) -> SearchResult:
     q_stripped = q.strip()
-    if not q_stripped:
-        raise HTTPException(
-            status_code=422,
-            detail="INVALID_QUERY: query must be 1-100 chars after strip",
-        )
     if len(q_stripped) > MAX_QUERY_LENGTH:
         raise HTTPException(
             status_code=422,
-            detail=f"INVALID_QUERY: query must be 1-100 chars (got {len(q_stripped)})",
+            detail=f"INVALID_QUERY: query must be at most 100 chars (got {len(q_stripped)})",
         )
-
-    # Escape ILIKE wildcards so user input is treated literally
-    escaped = (
-        q_stripped.replace("\\", "\\\\")
-        .replace("%", "\\%")
-        .replace("_", "\\_")
-    )
-    pattern = f"%{escaped}%"
 
     stmt = (
         select(
@@ -58,10 +46,20 @@ async def search_prices(
         )
         .join(Purchase, PurchaseItem.purchase_id == Purchase.id)
         .outerjoin(Supplier, Purchase.supplier_id == Supplier.id)
-        .where(PurchaseItem.name.ilike(pattern, escape="\\"))
         .order_by(Purchase.purchase_time.desc())
         .limit(limit)
     )
+
+    # Apply ILIKE filter only when query is non-empty
+    if q_stripped:
+        escaped = (
+            q_stripped.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        pattern = f"%{escaped}%"
+        stmt = stmt.where(PurchaseItem.name.ilike(pattern, escape="\\"))
+
     result = await db.execute(stmt)
     rows = result.all()
 

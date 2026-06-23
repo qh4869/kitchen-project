@@ -163,22 +163,68 @@ async def test_search_limit_over_max_returns_422(client):
     assert r.status_code == 422
 
 
-async def test_search_query_required(client):
+async def test_search_empty_q_returns_all_items(client):
+    """No q param → match-all, returns latest N items regardless of name."""
+    sid = await _make_supplier(client)
+    await _make_purchase(
+        client,
+        supplier_id=sid,
+        purchase_time=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        items=[
+            {"name": "番茄", "quantity": "1", "unit_price": "5"},
+            {"name": "鸡蛋", "quantity": "10", "unit_price": "1.2"},
+            {"name": "黄瓜", "quantity": "2", "unit_price": "3.8"},
+        ],
+    )
+
     r = await client.get("/api/v1/prices/search")
-    assert r.status_code == 422
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["query"] == ""
+    assert body["count"] == 3
+    names = {it["name"] for it in body["items"]}
+    assert names == {"番茄", "鸡蛋", "黄瓜"}
 
 
-async def test_search_query_empty_after_strip_returns_422(client):
+async def test_search_whitespace_q_returns_all_items(client):
+    """q='   ' strips to empty → match-all."""
+    sid = await _make_supplier(client)
+    await _make_purchase(
+        client,
+        supplier_id=sid,
+        purchase_time=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        items=[{"name": "番茄", "quantity": "1", "unit_price": "5"}],
+    )
+
     r = await client.get("/api/v1/prices/search", params={"q": "   "})
-    assert r.status_code == 422
-    assert r.json()["detail"] == "INVALID_QUERY: query must be 1-100 chars after strip"
+    assert r.status_code == 200
+    assert r.json()["count"] == 1
+
+
+async def test_search_empty_q_respects_limit(client):
+    """Empty q with limit=10 truncates to 10 even when more rows exist."""
+    sid = await _make_supplier(client)
+    items = [
+        {"name": f"x{i}", "quantity": "1", "unit_price": "1"}
+        for i in range(60)
+    ]
+    await _make_purchase(
+        client,
+        supplier_id=sid,
+        purchase_time=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        items=items,
+    )
+
+    r = await client.get("/api/v1/prices/search", params={"limit": 10})
+    assert r.status_code == 200
+    assert r.json()["count"] == 10
 
 
 async def test_search_query_too_long_returns_422(client):
     r = await client.get("/api/v1/prices/search", params={"q": "x" * 101})
     assert r.status_code == 422
     detail = r.json()["detail"]
-    assert detail.startswith("INVALID_QUERY: query must be 1-100 chars")
+    assert detail.startswith("INVALID_QUERY: query must be at most 100 chars")
     assert "101" in detail  # actual length is included
 
 
