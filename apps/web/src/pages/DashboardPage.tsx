@@ -21,7 +21,7 @@ type SearchResult = {
   items: SearchResultItem[];
 };
 
-type Phase = "initial" | "loading" | "empty" | "success" | "error";
+type Phase = "loading" | "empty" | "success" | "error";
 
 function formatPrice(unitPrice: string, unit: string | null): string {
   return `¥${unitPrice}${unit ? ` / ${unit}` : ""}`;
@@ -43,23 +43,19 @@ export default function DashboardPage() {
       api.get<SearchResult>(
         `/api/v1/prices/search?q=${encodeURIComponent(submittedQ)}`
       ),
-    enabled: !!submittedQ,
   });
 
-  const phase: Phase = !submittedQ
-    ? "initial"
-    : isFetching
-      ? "loading"
-      : error
-        ? "error"
-        : data && data.count === 0
-          ? "empty"
-          : "success";
+  const phase: Phase = isFetching
+    ? "loading"
+    : error
+      ? "error"
+      : data && data.count === 0
+        ? "empty"
+        : "success";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const q = input.trim();
-    if (q) setSubmittedQ(q);
+    setSubmittedQ(input.trim());
   };
 
   return (
@@ -71,23 +67,17 @@ export default function DashboardPage() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="输入食材名，如 番茄 / 鸡蛋 / 五花肉"
+          placeholder="输入食材名（留空 = 看最近 50 条），如 番茄 / 鸡蛋 / 五花肉"
           className="flex-1 rounded border border-slate-300 px-3 py-1.5 text-sm"
         />
         <button
           type="submit"
-          disabled={isFetching || !input.trim()}
+          disabled={isFetching}
           className="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:bg-slate-400"
         >
           {isFetching ? "搜索中…" : "搜索"}
         </button>
       </form>
-
-      {phase === "initial" && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          提示：商品名为 OCR 或手工录入时的原文，子串模糊匹配（"番" 能搜到番茄、番薯）。最多返回 50 条最近记录。
-        </div>
-      )}
 
       {phase === "loading" && (
         <p className="text-sm text-slate-500">查询中…</p>
@@ -101,14 +91,18 @@ export default function DashboardPage() {
 
       {phase === "empty" && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-          未找到 &ldquo;{submittedQ}&rdquo; 的采购记录。可以换个关键词，或先去「记账」/「采购记录」录入。
+          {submittedQ === ""
+            ? "暂无采购记录。去「记账」添加第一条。"
+            : `未找到 "${submittedQ}" 的采购记录。可以换个关键词，或先去「记账」/「采购记录」录入。`}
         </div>
       )}
 
       {phase === "success" && data && (
         <>
           <p className="mb-2 text-xs text-slate-500">
-            找到 {data.count} 条匹配记录（按采购时间倒序）
+            {submittedQ === ""
+              ? `最近 ${data.count} 条采购记录（按时间倒序）`
+              : `找到 ${data.count} 条匹配记录（按采购时间倒序）`}
           </p>
           <div className="overflow-hidden rounded-lg border border-slate-200">
             <table className="w-full text-sm">
