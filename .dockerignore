@@ -1,0 +1,38 @@
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.venv/
+**/venv/
+**/*.egg-info/
+
+# Node
+**/node_modules/
+**/dist/
+**/.vite/
+
+# Build artifacts
+apps/web/dist/
+
+# Git + IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+**/.claude/
+
+# Local runtime
+.env
+.env.local
+uploads/
+**/*.log
+
+# Plans + memory (not needed in image)
+docs/superpowers/
+.superpowers/
+
+# Misc
+*.md
+!apps/web/src/**/*.md
+README.md
+CLAUDE.md
