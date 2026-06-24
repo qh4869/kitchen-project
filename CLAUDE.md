@@ -73,6 +73,7 @@ POST /api/v1/purchases/from-ocr → verifies image exists, stamps ocr_provider
 - **On Windows the uvicorn worker can survive its parent process.** If you see stale behavior after restarting `pnpm dev:api`, run `taskkill //F //IM python.exe` to clear all Python processes, then start fresh. Stale `__pycache__` can also pin old code — safe to delete under `apps/api/app/`.
 - **`uv` is not on PATH on this machine.** Always invoke as `python -m uv ...` (the `pnpm` scripts already do this).
 - **Docker Hub is blocked on this network.** If `pnpm db:up` fails to pull `postgres:16-alpine`, configure `docker.m.daocloud.io` as a registry mirror in Docker Desktop settings (not `daemon.json` — that file is ignored by Docker Desktop).
+- **PyPI is slow / unreliable from China.** Inside `Dockerfile.api`, `pip install` and `uv sync` both default to `pypi.org/files.pythonhosted.org` which times out or crawls. The Dockerfile sets `PIP_INDEX_URL` and `UV_INDEX_URL` env vars to `https://mirrors.aliyun.com/pypi/simple/` to fix this. If you remove those env vars, the build hangs at `RUN pip install uv` (~25 MB wheel taking 10+ minutes).
 
 ## Test discipline
 
