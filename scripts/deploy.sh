@@ -1,23 +1,19 @@
 #!/usr/bin/env bash
-# Deploy (or update) kitchen-project on the ECS host.
-#
-# Usage:
-#   ECS_HOST=root@1.2.3.4 bash scripts/deploy.sh
-#
-# Requires: SSH key auth to the ECS already configured.
+# Deploy (or update) kitchen-project on this ECS host.
+# Run directly on the ECS (already SSH'd in) from anywhere:
+#   bash /path/to/kitchen-project/scripts/deploy.sh
+#   bash scripts/deploy.sh  (if cwd is project root)
+#   bash ~/kitchen-project/scripts/deploy.sh
 
 set -euo pipefail
 
-ECS_HOST="${ECS_HOST:?Set ECS_HOST=user@ip in env or .env.local}"
+# Find project root from this script's location (so cwd doesn't matter)
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-ssh "$ECS_HOST" <<'EOF'
-set -euo pipefail
-cd ~/kitchen-project
 git pull --ff-only
 docker compose -f docker-compose.prod.yml up -d --build
 # Run migrations inside the freshly built api container
 docker compose -f docker-compose.prod.yml exec -T api uv run alembic upgrade head
 docker image prune -f  # clean dangling images from previous builds
-EOF
 
-echo "Deploy complete. Verify at http://<ECS_IP>/"
+echo "Deploy complete. Verify at http://$(curl -s ifconfig.me)/"
