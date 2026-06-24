@@ -2,6 +2,10 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
+# China network: use Aliyun PyPI mirror (pypi.org/files.pythonhosted.org is slow)
+ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+
 # Install uv (per CLAUDE.md: not on PATH, use `python -m uv` or pip install)
 RUN pip install --no-cache-dir uv
 
