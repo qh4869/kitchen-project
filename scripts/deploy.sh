@@ -16,4 +16,4 @@ docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml exec -T api uv run alembic upgrade head
 docker image prune -f  # clean dangling images from previous builds
 
-echo "Deploy complete. Verify at http://$(curl -s ifconfig.me)/"
+echo "Deploy complete. Verify at http://<ECS_PUBLIC_IP>/"
