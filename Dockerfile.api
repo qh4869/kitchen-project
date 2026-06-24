@@ -2,29 +2,33 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# China network: use Aliyun PyPI mirror (pypi.org/files.pythonhosted.org is slow)
-ENV PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
-ENV UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+# China network: Tsinghua PyPI mirror (more reliable than aliyun for uv)
+# Note: uv.lock has hardcoded files.pythonhosted.org URLs that uv sync would
+# honor directly, bypassing UV_INDEX_URL. We use `uv pip install` below
+# instead of `uv sync` so the env var actually takes effect.
+ENV PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
+ENV UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple/
 
 # Install uv (per CLAUDE.md: not on PATH, use `python -m uv` or pip install)
 RUN pip install --no-cache-dir uv
 
-# First, install deps only (layer cache benefits: invalidated only when pyproject.toml/uv.lock change)
-COPY apps/api/pyproject.toml apps/api/uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+# Create venv + put it on PATH so subsequent commands find python/uvicorn
+RUN uv venv
+ENV PATH="/app/.venv/bin:$PATH"
 
-# Then copy app code
+# Copy project files
+COPY apps/api/pyproject.toml apps/api/uv.lock ./
 COPY apps/api/app ./app
 COPY apps/api/alembic ./alembic
 COPY apps/api/alembic.ini ./
 
-# Install the project itself (reuses cached deps)
-RUN uv sync --frozen --no-dev
+# Install project + deps via uv pip install (respects UV_INDEX_URL, unlike uv sync)
+RUN uv pip install --index-url https://pypi.tuna.tsinghua.edu.cn/simple/ .
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 3000
 
-# Production: no --reload; 2 workers enough for family traffic
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3000", "--workers", "2"]
+# Production: 2 workers enough for family traffic; venv on PATH so direct uvicorn call
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "3000", "--workers", "2"]
