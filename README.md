@@ -132,7 +132,7 @@ pnpm dev             # 同时启动前后端：api:3000 / web:5173
 | `docker-compose.prod.yml` | 3 服务编排 + pgdata/uploads 两个 named volumes |
 | `.env.example.prod` | 生产环境变量模板（DB 密码、LLM key、ECS IP） |
 | `.dockerignore` | 排除 venv / node_modules / dist / .git 等 |
-| `scripts/deploy.sh` | 本地一行命令远程 deploy |
+| `scripts/deploy.sh` | ECS 上直接跑的更新脚本（git pull + rebuild + migrate + prune） |
 | `scripts/backup-db.sh` | DB 每日备份（cron 调用） |
 
 ### ECS 准备（一次性）
@@ -179,13 +179,19 @@ crontab -e
 - `curl http://<ECS_IP>/api/v1/prices/search` → `{"query":"","count":N,"items":[...]}`
 - 浏览器开 `http://<ECS_IP>/`，4 个 nav 都能点开，OCR 上传 / 手工记账 / 价格搜索全跑通
 
-### 后续更新（本地一行命令）
+### 后续更新（在 ECS 上跑）
+
+SSH 进 ECS 后，任意目录下执行：
 
 ```bash
-ECS_HOST=root@<ECS_IP> bash scripts/deploy.sh
+bash ~/kitchen-project/scripts/deploy.sh
+# 或
+bash /path/to/kitchen-project/scripts/deploy.sh
 ```
 
-`deploy.sh` 做：SSH 进 ECS → `git pull` → `docker compose up -d --build` → `alembic upgrade head` → 清理 dangling 镜像。
+脚本用 `BASH_SOURCE[0]` 定位项目根，cwd 不影响。
+
+`deploy.sh` 做：`git pull` → `docker compose up -d --build` → `alembic upgrade head` → `docker image prune -f`（清理 dangling 镜像）。完成后打印 `Deploy complete.`。
 
 ### 生产 `.env` 字段说明
 
