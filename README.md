@@ -94,14 +94,166 @@ pnpm dev             # 同时启动前后端：api:3000 / web:5173
 | `pnpm test:api` | 运行后端 pytest |
 | `pnpm build:web` | 构建前端生产产物 |
 
-## 迁移到服务器
+## 部署到阿里云 ECS
 
-只需修改 `.env`：
-- `DATABASE_URL` → 远程 PG
-- `STORAGE_DRIVER=s3` + 对象存储凭证（S3/OSS 兼容）
-- `LLM_*` 不变（OCR 是第三方 API，与部署位置无关）
+### 架构
 
-前端 `pnpm build:web` 后产物为静态资源，可放任意 CDN / nginx。后端用 `uvicorn app.main:app --workers 4`（生产推荐 gunicorn + uvicorn worker）。
+```
+[Internet] → ECS :80
+              ↓
+       ┌──────────────────────────────────────────┐
+       │ web container (nginx:alpine)             │
+       │  ├ /              → baked 静态文件       │
+       │  ├ /api/v1/*      → 反代到 api:3000      │
+       │  └ /static/*      → 反代到 api:3000      │
+       └──────┬───────────────────────────────────┘
+              ↓ (docker internal network)
+       ┌──────────────────────────────────────────┐
+       │ api container (python:3.13-slim)         │
+       │  uvicorn --workers 2                     │
+       │  volume: /app/uploads                    │
+       └──────┬───────────────────────────────────┘
+              ↓
+       ┌──────────────────────────────────────────┐
+       │ postgres container (16-alpine)           │
+       │  volume: pgdata                          │
+       └──────────────────────────────────────────┘
+```
+
+3 个 docker 容器跑在同一台 ECS 上。HTTP-only v1，HTTPS / 域名后续扩展位。
+
+### 部署文件清单（已在 repo 里）
+
+| 文件 | 用途 |
+|---|---|
+| `Dockerfile.api` | Python 3.13 + uv sync + uvicorn (2 workers, 无 --reload) |
+| `Dockerfile.web` | 多阶段：node:22 build → nginx:alpine serve + 反代 |
+| `nginx/kitchen.conf` | `/` + `/api/` + `/static/` 三个 location，12M body，60s 超时 |
+| `docker-compose.prod.yml` | 3 服务编排 + pgdata/uploads 两个 named volumes |
+| `.env.example.prod` | 生产环境变量模板（DB 密码、LLM key、ECS IP） |
+| `.dockerignore` | 排除 venv / node_modules / dist / .git 等 |
+| `scripts/deploy.sh` | 本地一行命令远程 deploy |
+| `scripts/backup-db.sh` | DB 每日备份（cron 调用） |
+
+### ECS 准备（一次性）
+
+1. **买 ECS**：2 vCPU / 4 GB / 40 GB 系统盘 / Ubuntu 22.04 LTS / 北京或杭州区域（离 Volcengine Ark OCR 近）
+2. **安全组**：开 22（限你源 IP）+ 80（HTTP）。**不要**开 5432 / 3000（docker 内部网络用，外部访问不到也不需要）
+3. **SSH 登录后装 Docker + 配镜像加速**（China 网络必需）：
+   ```bash
+   sudo apt update && sudo apt install -y docker.io docker-compose-vpn git
+   sudo usermod -aG docker $USER
+   # 退出重登让 group 生效
+
+   # Docker Hub 镜像加速（China 网络必需，否则拉不到 postgres / python / nginx / node 镜像）
+   echo '{"registry-mirrors": ["https://docker.m.daocloud.io"]}' | sudo tee /etc/docker/daemon.json
+   sudo systemctl restart docker
+   ```
+
+### 首次部署
+
+```bash
+# 在 ECS 上：
+git clone git@github.com:qh4869/kitchen-project.git ~/kitchen-project
+cd ~/kitchen-project
+
+cp .env.example.prod .env
+nano .env       # 见下方"生产 .env 字段说明"
+chmod 600 .env  # 限制权限
+
+docker compose -f docker-compose.prod.yml up -d --build
+# 首次 build 约 5 分钟（拉镜像 + pnpm install + uv sync + vite build）
+
+docker compose -f docker-compose.prod.yml exec api uv run alembic upgrade head
+
+# 加 DB 每日备份 cron
+crontab -e
+# 加入：0 3 * * * /home/$USER/kitchen-project/scripts/backup-db.sh
+```
+
+### 验证
+
+- `curl http://<ECS_IP>/health` → `{"status":"ok"}`
+- `curl http://<ECS_IP>/api/v1/prices/search` → `{"query":"","count":N,"items":[...]}`
+- 浏览器开 `http://<ECS_IP>/`，4 个 nav 都能点开，OCR 上传 / 手工记账 / 价格搜索全跑通
+
+### 后续更新（本地一行命令）
+
+```bash
+ECS_HOST=root@<ECS_IP> bash scripts/deploy.sh
+```
+
+`deploy.sh` 做：SSH 进 ECS → `git pull` → `docker compose up -d --build` → `alembic upgrade head` → 清理 dangling 镜像。
+
+### 生产 `.env` 字段说明
+
+复制 `.env.example.prod` 为 `.env` 后，需要填/改这几个字段：
+
+| 字段 | 怎么填 | 用途 |
+|---|---|---|
+| `POSTGRES_USER` | `kitchen`（保持默认） | compose 初始化 PG 时创建的超级用户名 |
+| `POSTGRES_PASSWORD` | `openssl rand -base64 24` 生成的随机串 | PG 超级用户密码；compose 组装进 `DATABASE_URL` |
+| `POSTGRES_DB` | `kitchen`（保持默认） | compose 初始化时创建的默认库 |
+| `LLM_API_KEY` | `ark-...` 开头的 Volcengine Ark key | OCR 调用认证；同本地的那个 |
+| `LLM_MODEL` | `doubao-seed-2-0-mini-260428`（已填好，勿改） | Ark 模型 ID；老的 `Doubao-Seed-2.0-mini` 会 404 |
+| `OCR_PROVIDER` | `volcengine`（保持默认） | 生产必须真实调用，不用 `mock` |
+| `LLM_BASE_URL` | `https://ark.cn-beijing.volces.com/api/v3`（保持默认） | Ark OpenAI 兼容端点 |
+| `LLM_FORCE_JSON` | `true`（保持默认） | 强制 LLM 返回 JSON 对象 |
+| `STORAGE_DRIVER` | `local`（保持默认） | 上传图片存本地磁盘；未来切 OSS 时改 `s3` |
+| `UPLOAD_DIR` | `/app/uploads`（保持默认） | 容器内绝对路径；compose 把 volume 挂到这里 |
+| `WEB_ORIGIN` | `http://<ECS_IP>` | CORS 允许列表；同源时实际不生效，但配着防御 |
+
+注：`.env` 里**不要**写 `DATABASE_URL`，compose 会用 `${POSTGRES_USER}` 等组装好注入容器，覆盖优先级最高。
+
+### 运维
+
+**查日志**：
+```bash
+docker compose -f docker-compose.prod.yml logs -f api     # API 日志
+docker compose -f docker-compose.prod.yml logs -f web     # nginx 日志
+```
+
+**DB 备份恢复**：
+```bash
+gunzip -c /mnt/data/backups/kitchen-2026-06-23.sql.gz | \
+  docker compose -f docker-compose.prod.yml exec -T postgres psql -U kitchen kitchen
+```
+
+**升级 HTTPS（未来）**：
+1. 域名 ICP 备案（1-2 周）
+2. A 记录指向 ECS 公网 IP
+3. 改 `nginx/kitchen.conf` 加 `listen 443 ssl;` + 证书路径 + 80→443 跳转
+4. 安全组开 443
+
+## 本地 vs 生产 环境对比
+
+| | 本地 dev | 生产 prod |
+|---|---|---|
+| **API 进程** | 本机 uvicorn `--reload`（`pnpm dev:api`） | docker 容器 `kitchen-api`，`uvicorn --workers 2`（无 reload） |
+| **前端** | Vite dev server :5173（HMR） | nginx 容器 :80，服务构建产物静态文件 |
+| **Postgres** | docker 容器，暴露 5432 到 `localhost` | docker 容器，仅 docker 内部网络可达 |
+| **API → DB 连接** | `localhost:5432` | `postgres:5432`（按 compose 服务名解析） |
+| **前端 → API** | Vite dev proxy `/api → :3000` | nginx `location /api/ → api:3000` 反代 |
+| **图片存储** | `./uploads`（项目目录下） | docker volume `uploads`，挂到容器 `/app/uploads` |
+| **CORS** | 跨 :5173 ↔ :3000，必需 | 同源（都走 :80），实际不触发；配 `WEB_ORIGIN` 仅防御 |
+| **环境变量来源** | `.env`（来自 `.env.example`） | `.env`（来自 `.env.example.prod`）+ compose `environment:` 注入 |
+| **DB 凭据** | `kitchen/kitchen`（默认弱密码，仅本机） | 强随机密码（`openssl rand -base64 24`） |
+| **`DATABASE_URL`** | `.env` 里完整 URL | compose 用 `${POSTGRES_*}` 组装，**不要**在 `.env` 里写 |
+| **OCR provider** | 可选 `mock`（免 key 测流程） | 必须 `volcengine`（真实付费调用） |
+| **测试数据** | `pytest` 前会 wipe 表 | 真实数据；靠 `scripts/backup-db.sh` 每日备份 |
+
+### `.env` 选哪个模板
+
+| 文件 | 何时用 |
+|---|---|
+| `.env.example` | 本地 dev，复制成 `.env`，配合 `pnpm dev` |
+| `.env.example.prod` | ECS 生产，复制成 `.env`，配合 `docker compose -f docker-compose.prod.yml` |
+
+两个文件**互不干扰**：
+- 本地的 `pnpm dev` 和 `docker-compose.yml`（仅起 PG）**完全不读** `.env.example.prod`
+- 生产 compose **完全不读** `.env.example`
+
+如果你在本地不小心把 `.env` 改成了 prod 模板的内容（含 `POSTGRES_PASSWORD` 等字段），`pnpm dev` 会找不到 `DATABASE_URL` 启动失败 —— 这时把 `.env` 删掉重新 `cp .env.example .env` 即可。
 
 ## 待开发与遗留事项
 
