@@ -221,6 +221,24 @@ docker compose -f docker-compose.prod.yml logs -f api     # API 日志
 docker compose -f docker-compose.prod.yml logs -f web     # nginx 日志
 ```
 
+**清空数据（出厂设置）**：
+
+⚠️ **破坏性操作**。会删除所有采购记录、供应商、上传的图片，DB 重建空 schema。
+
+```bash
+bash ~/kitchen-project/scripts/reset-db.sh
+# 提示后输入 'reset' 确认
+```
+
+脚本做：`docker compose down -v`（删 pgdata + uploads volumes）→ `up -d`（建空 volume + 起容器）→ 等 postgres healthy → `alembic upgrade head`（按 migrations 建表）。镜像不重建（layer cache 命中）。
+
+如果只想清 DB 不删图片，手动执行：
+```bash
+docker compose -f docker-compose.prod.yml exec postgres \
+  psql -U kitchen kitchen -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+docker compose -f docker-compose.prod.yml exec api uv run alembic upgrade head
+```
+
 **DB 备份恢复**：
 ```bash
 gunzip -c /mnt/data/backups/kitchen-2026-06-23.sql.gz | \
