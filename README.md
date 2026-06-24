@@ -150,6 +150,8 @@ pnpm dev             # 同时启动前后端：api:3000 / web:5173
    sudo systemctl restart docker
    ```
 
+   **PyPI 镜像在 Dockerfile 里已经配好了**（`tsinghua` mirror via `UV_INDEX_URL` env var），不用 ECS 上手动配。注意 `Dockerfile.api` 用的是 `uv pip install` 而非 `uv sync` —— `uv.lock` 里有写死的 `files.pythonhosted.org` URL，`uv sync` 会直连绕过 env var。详见 `CLAUDE.md` 的 "Dev-server quirks" 段。
+
 ### 首次部署
 
 ```bash
