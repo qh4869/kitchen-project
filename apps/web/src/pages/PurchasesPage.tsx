@@ -45,7 +45,7 @@ export default function PurchasesPage() {
       {isLoading && <p className="text-slate-500">加载中…</p>}
       {error && <p className="text-red-600">加载失败：{(error as ApiError).detail}</p>}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-600">
             <tr>
