@@ -104,7 +104,7 @@ export default function DashboardPage() {
               ? `最近 ${data.count} 条采购记录（按时间倒序）`
               : `找到 ${data.count} 条匹配记录（按采购时间倒序）`}
           </p>
-          <div className="overflow-hidden rounded-lg border border-slate-200">
+          <div className="overflow-x-auto rounded-lg border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-600">
                 <tr>

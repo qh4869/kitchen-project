@@ -25,7 +25,7 @@ export default function ItemEditor({
     ]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200">
+    <div className="overflow-x-auto rounded-lg border border-slate-200">
       <table className="w-full text-sm">
         <thead className="bg-slate-50 text-slate-600">
           <tr>
