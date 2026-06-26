@@ -42,6 +42,7 @@ async def search_prices(
             PurchaseItem.id.label("purchase_item_id"),
             Purchase.id.label("purchase_id"),
             Purchase.purchase_time,
+            Purchase.receipt_image_path,
             Supplier.id.label("supplier_id"),
             Supplier.name.label("supplier_name"),
         )
@@ -77,6 +78,7 @@ async def search_prices(
             purchase_id=row.purchase_id,
             purchase_item_id=row.purchase_item_id,
             purchase_time=row.purchase_time,
+            receipt_image_path=row.receipt_image_path,
         )
         for row in rows
     ]

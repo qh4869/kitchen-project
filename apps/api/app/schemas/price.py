@@ -23,6 +23,7 @@ class SearchResultItem(BaseModel):
     purchase_id: UUID
     purchase_item_id: UUID
     purchase_time: datetime
+    receipt_image_path: str | None
 
 
 class SearchResult(BaseModel):

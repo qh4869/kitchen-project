@@ -15,6 +15,7 @@ type SearchResultItem = {
   purchase_id: string;
   purchase_item_id: string;
   purchase_time: string;
+  receipt_image_path: string | null;
 };
 
 type SearchResult = {
@@ -38,6 +39,7 @@ function formatTime(iso: string): string {
 export default function DashboardPage() {
   const [input, setInput] = useState("");
   const [submittedQ, setSubmittedQ] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   const { data, isFetching, error } = useQuery<SearchResult>({
     queryKey: ["prices", submittedQ],
@@ -159,6 +161,17 @@ export default function DashboardPage() {
                       {formatTime(it.purchase_time)}
                     </td>
                     <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                      {it.receipt_image_path && (
+                        <button
+                          type="button"
+                          title="查看照片"
+                          className="text-xs text-slate-500 hover:text-slate-700 disabled:opacity-50 mr-2"
+                          onClick={() => setPhotoUrl(`/static/${it.receipt_image_path}`)}
+                          disabled={deleteMut.isPending}
+                        >
+                          📷
+                        </button>
+                      )}
                       <button
                         type="button"
                         title="编辑"
@@ -184,6 +197,28 @@ export default function DashboardPage() {
             </table>
           </div>
         </>
+      )}
+
+      {photoUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
+          onClick={() => setPhotoUrl(null)}
+        >
+          <button
+            type="button"
+            className="absolute right-4 top-4 text-3xl text-white/80 hover:text-white"
+            onClick={() => setPhotoUrl(null)}
+            aria-label="关闭"
+          >
+            ×
+          </button>
+          <img
+            src={photoUrl}
+            alt="原始照片"
+            className="max-h-[90vh] max-w-[90vw] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   );
