@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
 
 type SearchResultItem = {
@@ -12,6 +12,7 @@ type SearchResultItem = {
   supplier_id: string | null;
   supplier_name: string | null;
   purchase_id: string;
+  purchase_item_id: string;
   purchase_time: string;
 };
 
@@ -44,6 +45,24 @@ export default function DashboardPage() {
         `/api/v1/prices/search?q=${encodeURIComponent(submittedQ)}`
       ),
   });
+
+  const qc = useQueryClient();
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/purchase-items/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["prices"] });
+    },
+    onError: (err: ApiError) => {
+      alert(err.detail || "删除失败，请稍后再试");
+    },
+  });
+
+  const handleDelete = (id: string, name: string) => {
+    if (window.confirm(`确定删除「${name}」这条记录？`)) {
+      deleteMut.mutate(id);
+    }
+  };
 
   const phase: Phase = isFetching
     ? "loading"
@@ -112,6 +131,7 @@ export default function DashboardPage() {
                   <th className="px-3 py-2 text-right font-medium">单价</th>
                   <th className="px-3 py-2 text-left font-medium">店铺</th>
                   <th className="px-3 py-2 text-left font-medium">采购时间</th>
+                  <th className="px-3 py-2 text-right font-medium">操作</th>
                 </tr>
               </thead>
               <tbody>
@@ -128,6 +148,17 @@ export default function DashboardPage() {
                     </td>
                     <td className="px-3 py-1.5 text-slate-600">
                       {formatTime(it.purchase_time)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right">
+                      <button
+                        type="button"
+                        title="删除"
+                        className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+                        onClick={() => handleDelete(it.purchase_item_id, it.name)}
+                        disabled={deleteMut.isPending}
+                      >
+                        ✕
+                      </button>
                     </td>
                   </tr>
                 ))}
