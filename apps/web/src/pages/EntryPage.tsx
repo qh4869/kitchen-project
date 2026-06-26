@@ -19,7 +19,6 @@ type OcrResult = {
   image_key: string;
   supplier_name: string | null;
   purchase_time: string | null;
-  total_amount: string | null;
   items: OcrItem[];
   raw_llm_output: Record<string, unknown>;
   provider: string;
@@ -69,7 +68,6 @@ export default function EntryPage() {
 
   const [photoSupplierId, setPhotoSupplierId] = useState<string>("");
   const [photoPurchaseTime, setPhotoPurchaseTime] = useState<string>("");
-  const [photoTotalAmount, setPhotoTotalAmount] = useState<string>("");
   const [photoItems, setPhotoItems] = useState<Item[]>([]);
   const [photoRawLlm, setPhotoRawLlm] = useState<Record<string, unknown>>({});
   const [photoDirty, setPhotoDirty] = useState(false);
@@ -77,7 +75,6 @@ export default function EntryPage() {
   // --- Manual mode state (new) ---
   const [manualSupplierId, setManualSupplierId] = useState<string>("");
   const [manualPurchaseTime, setManualPurchaseTime] = useState<string>(nowLocalDateTime());
-  const [manualTotalAmount, setManualTotalAmount] = useState<string>("");
   const [manualItems, setManualItems] = useState<Item[]>([{ ...EMPTY_ITEM }]);
 
   const { data: suppliers } = useQuery<Supplier[]>({
@@ -97,7 +94,6 @@ export default function EntryPage() {
       setImageKey(r.image_key);
       setPhotoRawLlm(r.raw_llm_output);
       setPhotoItems(r.items.map(itemFromOcr));
-      setPhotoTotalAmount(num(r.total_amount));
       setPhotoPhase("recognized");
       if (r.items.length === 0) {
         setPhotoErrorMsg("未识别到任何商品信息，请重拍或改手工录入");
@@ -116,7 +112,6 @@ export default function EntryPage() {
         image_key: imageKey,
         supplier_id: photoSupplierId || null,
         purchase_time: photoPurchaseTime ? new Date(photoPurchaseTime).toISOString() : null,
-        total_amount: photoTotalAmount || null,
         ocr_raw: photoRawLlm,
         manual_adjustment: photoDirty,
         items: photoItems
@@ -154,7 +149,6 @@ export default function EntryPage() {
         purchase_time: manualPurchaseTime
           ? new Date(manualPurchaseTime).toISOString()
           : null,
-        total_amount: manualTotalAmount || null,
         items: manualItems
           .filter((i) => i.name.trim() && i.unit_price)
           .map((i) => ({
@@ -181,7 +175,6 @@ export default function EntryPage() {
     setPhotoErrorMsg(null);
     setPhotoSupplierId("");
     setPhotoPurchaseTime("");
-    setPhotoTotalAmount("");
     setPhotoItems([]);
     setPhotoRawLlm({});
     setPhotoDirty(false);
@@ -191,7 +184,6 @@ export default function EntryPage() {
     manualSaveMut.reset();
     setManualSupplierId("");
     setManualPurchaseTime(nowLocalDateTime());
-    setManualTotalAmount("");
     setManualItems([{ ...EMPTY_ITEM }]);
   };
 
@@ -323,7 +315,7 @@ export default function EntryPage() {
             photoPhase === "saving" ||
             photoPhase === "saved") && (
             <section className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="text-slate-600">供应商</span>
                   <select
@@ -350,19 +342,6 @@ export default function EntryPage() {
                     value={photoPurchaseTime}
                     onChange={(e) => {
                       setPhotoPurchaseTime(e.target.value);
-                      setPhotoDirty(true);
-                    }}
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-slate-600">总额 (¥)</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="rounded border border-slate-300 px-2 py-1"
-                    value={photoTotalAmount}
-                    onChange={(e) => {
-                      setPhotoTotalAmount(e.target.value);
                       setPhotoDirty(true);
                     }}
                   />
@@ -413,7 +392,7 @@ export default function EntryPage() {
             </section>
           ) : (
             <section className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="mb-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label className="flex flex-col gap-1 text-sm">
                   <span className="text-slate-600">供应商</span>
                   <select
@@ -439,18 +418,6 @@ export default function EntryPage() {
                     value={manualPurchaseTime}
                     onChange={(e) => {
                       setManualPurchaseTime(e.target.value);
-                    }}
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-slate-600">总额 (¥)</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="rounded border border-slate-300 px-2 py-1"
-                    value={manualTotalAmount}
-                    onChange={(e) => {
-                      setManualTotalAmount(e.target.value);
                     }}
                   />
                 </label>
