@@ -18,6 +18,7 @@ def test_search_result_item_accepts_all_fields():
         supplier_id=uuid4(),
         supplier_name="城南菜场",
         purchase_id=uuid4(),
+        purchase_item_id=uuid4(),
         purchase_time=datetime(2026, 6, 17, 9, 32, 29),
     )
     assert item.name == "番茄"
@@ -36,6 +37,7 @@ def test_search_result_item_allows_null_supplier():
         supplier_id=None,
         supplier_name=None,
         purchase_id=uuid4(),
+        purchase_item_id=uuid4(),
         purchase_time=datetime(2026, 6, 17),
     )
     assert item.supplier_id is None
@@ -62,6 +64,7 @@ def test_search_result_decimal_serializes_as_str():
         supplier_id=None,
         supplier_name=None,
         purchase_id=uuid4(),
+        purchase_item_id=uuid4(),
         purchase_time=datetime(2026, 6, 17),
     )
     encoded = jsonable_encoder(item)

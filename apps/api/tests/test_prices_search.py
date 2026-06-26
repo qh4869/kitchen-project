@@ -44,6 +44,8 @@ async def test_search_returns_matching_items_ordered_by_time_desc(client):
     assert body["count"] == 2
     assert body["items"][0]["purchase_id"] == newer
     assert body["items"][1]["purchase_id"] == older
+    assert "purchase_item_id" in body["items"][0]
+    assert body["items"][0]["purchase_item_id"]  # non-empty uuid string
 
 
 async def test_search_case_insensitive(client):

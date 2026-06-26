@@ -21,6 +21,7 @@ class SearchResultItem(BaseModel):
     supplier_id: UUID | None
     supplier_name: str | None
     purchase_id: UUID
+    purchase_item_id: UUID
     purchase_time: datetime
 
 
