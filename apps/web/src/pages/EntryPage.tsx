@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
@@ -87,6 +87,8 @@ export default function EntryPage() {
   const editPurchaseId = searchParams.get("edit");
   const isEditMode = !!editPurchaseId;
 
+  const didPrefillRef = useRef(false);
+
   const { data: editPurchase } = useQuery<PurchaseOut>({
     queryKey: ["purchase", editPurchaseId],
     queryFn: () => api.get<PurchaseOut>(`/api/v1/purchases/${editPurchaseId}`),
@@ -94,7 +96,8 @@ export default function EntryPage() {
   });
 
   useEffect(() => {
-    if (editPurchase) {
+    if (editPurchase && !didPrefillRef.current) {
+      didPrefillRef.current = true;
       setManualSupplierId(editPurchase.supplier_id ?? "");
       setManualPurchaseTime(toLocalInputValue(editPurchase.purchase_time));
       setManualItems(
