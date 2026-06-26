@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 
 type SearchResultItem = {
@@ -47,6 +48,14 @@ export default function DashboardPage() {
   });
 
   const qc = useQueryClient();
+
+  const navigate = useNavigate();
+
+  const handleEdit = (purchaseId: string) => {
+    if (window.confirm("编辑将打开该记录所属采购单的全部内容，是否继续？")) {
+      navigate(`/entry?edit=${purchaseId}`);
+    }
+  };
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => api.delete(`/api/v1/purchase-items/${id}`),
@@ -149,7 +158,16 @@ export default function DashboardPage() {
                     <td className="px-3 py-1.5 text-slate-600">
                       {formatTime(it.purchase_time)}
                     </td>
-                    <td className="px-3 py-1.5 text-right">
+                    <td className="px-3 py-1.5 text-right whitespace-nowrap">
+                      <button
+                        type="button"
+                        title="编辑"
+                        className="text-xs text-slate-500 hover:text-slate-700 disabled:opacity-50 mr-2"
+                        onClick={() => handleEdit(it.purchase_id)}
+                        disabled={deleteMut.isPending}
+                      >
+                        ✎
+                      </button>
                       <button
                         type="button"
                         title="删除"
