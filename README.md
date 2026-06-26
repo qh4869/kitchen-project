@@ -32,16 +32,17 @@ kitchen-project/
 | 模块 | 状态 | 说明 |
 |---|---|---|
 | 供应商管理（CRUD） | ✅ | 线下菜场 / 超市维护 |
-| 采购记录（CRUD） | ✅ | 手工录入或 OCR 落库 |
 | 记账（拍照 + 手工） | ✅ | 拍照：上传小票 / 价签 → LLM 识别 → 人工微调；手工：直接填写明细 → 保存（`POST /api/v1/purchases`） |
-| 价格查询（搜索） | ✅ | 按食材名 ILIKE 子串匹配，返回最近 50 条价格 + 店铺 + 时间 |
+| 首页（最近采购 + 搜索 + 编辑/删除） | ✅ | `/` 自动加载最近 50 条；支持按食材名搜索；每行 ✎ 编辑 / ✕ 删除 |
 | 价格曲线 / 跨店比价 | 🚧 | 需先做商品名 / 单位归一化 |
 
 **OCR 流程**：浏览器上传图片 → `/uploads` Pillow 预处理（HEIC 解码 / EXIF 旋转 / 压缩）→ `/ocr/extract` 调用 LLM 提取商品明细（30s 超时）→ 前端可编辑 → `/purchases/from-ocr` 落库。识别对象支持采购小票、单品价签、菜摊 / 货架陈列照、冷柜分类牌。
 
-**手工记账**：`/entry` 页面切到 "✍️ 手工" mode → 直接填供应商 / 时间 / 总额 + 商品明细（复用 `ItemEditor`）→ `POST /api/v1/purchases` 落库。不经过 OCR，适合没拍照、记得买了什么的快速记录。
+**手工记账**：`/entry` 页面切到 "✍️ 手工" mode → 直接填供应商 / 时间 + 商品明细（复用 `ItemEditor`）→ `POST /api/v1/purchases` 落库。不经过 OCR，适合没拍照、记得买了什么的快速记录。
 
-**价格查询**：`/dashboard` 输入食材名（如"番茄"）→ ILIKE 子串模糊匹配 `purchase_items.name` → 表格返回最近 50 条记录，按采购时间倒序，含商品名 / 单价+单位 / 店铺 / 采购时间。未绑店铺的记录显示"—（未绑店铺）"。
+**首页 / 价格查询**：`/` 进页面自动加载最近 50 条采购（按时间倒序）；输入食材名（如"番茄"）回车 → ILIKE 子串模糊匹配 `purchase_items.name` → 表格按采购时间倒序，含商品名 / 单价+单位 / 店铺 / 采购时间 / 操作。未绑店铺的记录显示"—（未绑店铺）"。每行的操作列：
+- **✎ 编辑** — 弹确认 → 跳到 `/entry?edit={purchase_id}` → 手工模式打开整张采购单，可改字段 / 加新条目 / 删条目 → 保存修改（`PUT /api/v1/purchases/{id}`）→ 跳回首页刷新
+- **✕ 删除** — 弹确认 → 删除该商品（`DELETE /api/v1/purchase-items/{id}`）→ 如果是 purchase 最后一条，整张 purchase 一起级联删
 
 ## 快速开始
 
@@ -177,7 +178,7 @@ crontab -e
 
 - `curl http://<ECS_IP>/health` → `{"status":"ok"}`
 - `curl http://<ECS_IP>/api/v1/prices/search` → `{"query":"","count":N,"items":[...]}`
-- 浏览器开 `http://<ECS_IP>/`，4 个 nav 都能点开，OCR 上传 / 手工记账 / 价格搜索全跑通
+- 浏览器开 `http://<ECS_IP>/`，3 个 nav 都能点开（首页 / 记账 / 供应商），OCR 上传 / 手工记账 / 价格搜索 + 编辑/删除全跑通
 
 ### 后续更新（在 ECS 上跑）
 
@@ -299,7 +300,7 @@ gunzip -c /mnt/data/backups/kitchen-2026-06-23.sql.gz | \
 
 - **`datetime.utcnow()` 弃用警告**：`apps/api/app/routers/uploads.py:49` 及其测试用 `datetime.utcnow()`，Python 3.13 标记为弃用。改为 `datetime.now(datetime.UTC)`
 - **`/suppliers` 的 ILIKE 未转义**：`apps/api/app/routers/suppliers.py` 直接拼 `%{q}%`，用户输入 `%` / `_` 会被当通配符。与 `/prices/search` 的转义逻辑（`routers/prices.py:39-43`）不一致，应对齐
-- **前端手写类型 vs 生成类型**：`DashboardPage.tsx`、`EntryPage.tsx` 等手写响应类型，没用 `@kitchen/api-types`。存在漂移风险，应统一改为 `import type { paths } from "@kitchen/api-types"`
+- **前端手写类型 vs 生成类型**：`DashboardPage.tsx`、`EntryPage.tsx` 等手写响应类型（含 Phase 3.7 新增的 `PurchaseOut` / `PurchaseOutItem`），没用 `@kitchen/api-types`。存在漂移风险，应统一改为 `import type { paths } from "@kitchen/api-types"`
 - **`test_search_default_limit_50` 二级排序未验证**：60 条记录同 `purchase_time` 时，`ORDER BY` 无 tie-breaker，顺序未定义。测试只验 count，未验顺序确定性
 - **`purchase_items.name` 无 trigram 索引**：`LIKE '%foo%'` 走全表扫。家庭数据量无感，若数据量大需加 `pg_trgm` 扩展 + GIN 索引
 
