@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import ImageUploader from "../components/ImageUploader";
 import ItemEditor, { type Item } from "../components/ItemEditor";
@@ -24,6 +25,25 @@ type OcrResult = {
   provider: string;
 };
 
+type PurchaseOutItem = {
+  id: string;
+  name: string;
+  quantity: string;
+  unit: string | null;
+  unit_price: string;
+  category: string | null;
+  brand: string | null;
+};
+
+type PurchaseOut = {
+  id: string;
+  supplier_id: string | null;
+  purchase_time: string;
+  notes: string | null;
+  manual_adjustment: boolean;
+  items: PurchaseOutItem[];
+};
+
 type PhotoPhase = "idle" | "uploaded" | "recognizing" | "recognized" | "failed" | "saving" | "saved";
 type ManualPhase = "idle" | "saving" | "saved" | "error";
 
@@ -45,6 +65,12 @@ function nowLocalDateTime(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function toLocalInputValue(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 const EMPTY_ITEM: Item = {
   name: "",
   quantity: "1",
@@ -56,6 +82,35 @@ const EMPTY_ITEM: Item = {
 
 export default function EntryPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editPurchaseId = searchParams.get("edit");
+  const isEditMode = !!editPurchaseId;
+
+  const { data: editPurchase } = useQuery<PurchaseOut>({
+    queryKey: ["purchase", editPurchaseId],
+    queryFn: () => api.get<PurchaseOut>(`/api/v1/purchases/${editPurchaseId}`),
+    enabled: isEditMode,
+  });
+
+  useEffect(() => {
+    if (editPurchase) {
+      setManualSupplierId(editPurchase.supplier_id ?? "");
+      setManualPurchaseTime(toLocalInputValue(editPurchase.purchase_time));
+      setManualItems(
+        editPurchase.items.map((it) => ({
+          name: it.name,
+          quantity: it.quantity,
+          unit: it.unit ?? "",
+          unit_price: it.unit_price,
+          category: it.category ?? "",
+          brand: it.brand ?? "",
+        }))
+      );
+    }
+  }, [editPurchase]);
+
+  const isLoadingPurchase = isEditMode && !editPurchase;
 
   // --- Mode (segmented control) ---
   const [mode, setMode] = useState<Mode>("photo");
@@ -149,6 +204,7 @@ export default function EntryPage() {
         purchase_time: manualPurchaseTime
           ? new Date(manualPurchaseTime).toISOString()
           : null,
+        manual_adjustment: isEditMode ? true : undefined,
         items: manualItems
           .filter((i) => i.name.trim() && i.unit_price)
           .map((i) => ({
@@ -160,10 +216,18 @@ export default function EntryPage() {
             brand: i.brand?.trim() || null,
           })),
       };
+      if (isEditMode && editPurchaseId) {
+        return api.put(`/api/v1/purchases/${editPurchaseId}`, body);
+      }
       return api.post("/api/v1/purchases", body);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["purchases"] });
+      qc.invalidateQueries({ queryKey: ["prices"] });
+      if (isEditMode && editPurchaseId) {
+        qc.invalidateQueries({ queryKey: ["purchase", editPurchaseId] });
+        navigate("/");
+      }
     },
   });
 
@@ -213,37 +277,50 @@ export default function EntryPage() {
     !manualSaveMut.isPending &&
     manualItems.filter((i) => i.name.trim() && i.unit_price).length > 0;
 
+  if (isLoadingPurchase) {
+    return (
+      <div className="max-w-3xl">
+        <p className="text-sm text-slate-500">加载采购单...</p>
+      </div>
+    );
+  }
+
+  // In edit mode we always render the manual form regardless of the segmented control.
+  const effectiveMode: Mode = isEditMode ? "manual" : mode;
+
   return (
     <div className="max-w-3xl">
-      <h2 className="mb-4 text-xl font-bold">记账</h2>
+      <h2 className="mb-4 text-xl font-bold">{isEditMode ? "编辑记录" : "记账"}</h2>
 
       {/* Segmented control */}
-      <div className="mb-4 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
-        <button
-          type="button"
-          onClick={() => switchMode("photo")}
-          className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
-            mode === "photo"
-              ? "bg-white text-emerald-700 font-medium shadow-sm"
-              : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          📷 拍照
-        </button>
-        <button
-          type="button"
-          onClick={() => switchMode("manual")}
-          className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
-            mode === "manual"
-              ? "bg-white text-emerald-700 font-medium shadow-sm"
-              : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          ✍️ 手工
-        </button>
-      </div>
+      {!isEditMode && (
+        <div className="mb-4 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+          <button
+            type="button"
+            onClick={() => switchMode("photo")}
+            className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
+              mode === "photo"
+                ? "bg-white text-emerald-700 font-medium shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            📷 拍照
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("manual")}
+            className={`rounded-md px-4 py-1.5 text-sm transition-colors ${
+              mode === "manual"
+                ? "bg-white text-emerald-700 font-medium shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            ✍️ 手工
+          </button>
+        </div>
+      )}
 
-      {mode === "photo" ? (
+      {effectiveMode === "photo" ? (
         <>
           {/* ============ PHOTO MODE (unchanged from original UploadPage) ============ */}
           <section className="mb-6 rounded-lg border border-slate-200 bg-white p-4">
@@ -437,6 +514,15 @@ export default function EntryPage() {
               )}
 
               <div className="mt-4 flex justify-end gap-2">
+                {isEditMode && (
+                  <button
+                    type="button"
+                    className="rounded border border-slate-300 px-4 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                    onClick={() => navigate("/")}
+                  >
+                    取消
+                  </button>
+                )}
                 <button
                   type="button"
                   className="rounded bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:bg-slate-400"
@@ -445,7 +531,11 @@ export default function EntryPage() {
                   }}
                   disabled={!manualCanSave}
                 >
-                  {manualPhase === "saving" ? "保存中…" : "保存"}
+                  {manualPhase === "saving"
+                    ? "保存中…"
+                    : isEditMode
+                      ? "保存修改"
+                      : "保存"}
                 </button>
               </div>
             </section>
