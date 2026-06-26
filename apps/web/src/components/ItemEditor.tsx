@@ -25,8 +25,8 @@ export default function ItemEditor({
     ]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-200">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto rounded-lg border border-slate-200">
+      <table className="w-full text-sm min-w-[680px]">
         <thead className="bg-slate-50 text-slate-600">
           <tr>
             <th className="px-2 py-1.5 text-left font-medium">名称</th>
