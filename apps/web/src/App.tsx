@@ -1,14 +1,12 @@
 import { NavLink, Route, Routes } from "react-router-dom";
-import SuppliersPage from "./pages/SuppliersPage";
-import PurchasesPage from "./pages/PurchasesPage";
 import EntryPage from "./pages/EntryPage";
+import SuppliersPage from "./pages/SuppliersPage";
 import DashboardPage from "./pages/DashboardPage";
 
 const navItems = [
-  { to: "/", label: "采购记录", end: true, page: "purchases" },
+  { to: "/", label: "首页", end: true, page: "dashboard" },
   { to: "/entry", label: "记账", end: false, page: "entry" },
   { to: "/suppliers", label: "供应商", end: false, page: "suppliers" },
-  { to: "/dashboard", label: "价格仪表盘", end: false, page: "dashboard" },
 ];
 
 export default function App() {
@@ -40,10 +38,9 @@ export default function App() {
       </aside>
       <main className="flex-1 overflow-x-hidden p-6">
         <Routes>
-          <Route path="/" element={<PurchasesPage />} />
+          <Route path="/" element={<DashboardPage />} />
           <Route path="/entry" element={<EntryPage />} />
           <Route path="/suppliers" element={<SuppliersPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
         </Routes>
       </main>
     </div>
