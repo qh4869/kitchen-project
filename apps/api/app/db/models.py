@@ -63,7 +63,6 @@ class Purchase(Base):
     supplier_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("suppliers.id", ondelete="SET NULL")
     )
-    total_amount: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     purchase_time: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -30,7 +30,6 @@ async def test_from_ocr_creates_purchase(client, tmp_path):
             {"name": "鸡蛋", "quantity": "10", "unit": "个", "unit_price": "1.20"},
         ],
         "ocr_raw": {"mock": True},
-        "total_amount": "19.50",
     }
     r = await client.post("/api/v1/purchases/from-ocr", json=payload)
     assert r.status_code == 201, r.text

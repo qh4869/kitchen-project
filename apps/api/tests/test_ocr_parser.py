@@ -25,10 +25,9 @@ def test_parse_extracts_json_from_surrounding_text():
 
 
 def test_parse_copies_top_level_fields():
-    content = '{"supplier_name": "城南菜场", "total_amount": 19.5, "items": [{"name": "番茄", "unit_price": 6.5}]}'
+    content = '{"supplier_name": "城南菜场", "items": [{"name": "番茄", "unit_price": 6.5}]}'
     result = parse_llm_json(content, provider="mock", image_key="x.jpg")
     assert result.supplier_name == "城南菜场"
-    assert result.total_amount == 19.5
 
 
 def test_parse_preserves_raw_output():

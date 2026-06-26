@@ -54,7 +54,6 @@ async def list_purchases(
         {
             "id": p.id,
             "supplier_id": p.supplier_id,
-            "total_amount": p.total_amount,
             "purchase_time": p.purchase_time,
             "manual_adjustment": p.manual_adjustment,
             "item_count": count,
@@ -70,7 +69,6 @@ async def create_purchase(
 ) -> Purchase:
     purchase = Purchase(
         supplier_id=payload.supplier_id,
-        total_amount=payload.total_amount,
         purchase_time=payload.purchase_time,
         notes=payload.notes,
         items=[
@@ -101,7 +99,6 @@ async def create_purchase_from_ocr(
 
     purchase = Purchase(
         supplier_id=payload.supplier_id,
-        total_amount=payload.total_amount,
         purchase_time=payload.purchase_time,
         notes=payload.notes,
         receipt_image_path=payload.image_key,

@@ -23,7 +23,6 @@ class OcrResult(BaseModel):
     image_key: str
     supplier_name: str | None = None
     purchase_time: datetime | None = None
-    total_amount: Decimal | None = None
     items: list[OcrItem] = Field(default_factory=list)
     raw_llm_output: dict[str, Any] = Field(default_factory=dict)
     provider: str
@@ -44,7 +43,6 @@ class PurchaseFromOcrRequest(BaseModel):
     image_key: str
     supplier_id: UUID | None = None
     purchase_time: datetime | None = None
-    total_amount: Decimal | None = Field(None, ge=0)
     notes: str | None = None
     ocr_raw: dict[str, Any] | None = None
     manual_adjustment: bool = False

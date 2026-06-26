@@ -47,7 +47,6 @@ async def test_create_and_get_with_items(client):
     payload = _Encoder.to_jsonable(
         {
             "supplier_id": supplier["id"],
-            "total_amount": Decimal("19.50"),
             "items": [_items(name="番茄"), _items(name="黄瓜", unit_price=Decimal("4.00"))],
         }
     )
@@ -102,11 +101,10 @@ async def test_update_marks_manual_adjustment(client):
     created = (await client.post(PURCHASES, json=_Encoder.to_jsonable({"items": [_items()]}))).json()
     r = await client.put(
         f"{PURCHASES}/{created['id']}",
-        json={"total_amount": "99.99", "manual_adjustment": True},
+        json={"manual_adjustment": True},
     )
     assert r.status_code == 200
     body = r.json()
-    assert body["total_amount"] == "99.99"
     assert body["manual_adjustment"] is True
 
 

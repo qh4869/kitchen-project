@@ -8,7 +8,6 @@ def test_system_prompt_mentions_json():
 def test_system_prompt_lists_required_fields():
     assert "supplier_name" in SYSTEM_PROMPT
     assert "purchase_time" in SYSTEM_PROMPT
-    assert "total_amount" in SYSTEM_PROMPT
     assert "items" in SYSTEM_PROMPT
 
 

@@ -6,7 +6,6 @@ from app.schemas.ocr import OcrItem, OcrResult
 _DEFAULT_RESULT = OcrResult(
     image_key="mock",
     supplier_name="mock 菜场",
-    total_amount=None,
     items=[
         OcrItem(name="番茄（mock）", quantity=1.5, unit="kg", unit_price=6.5, category="蔬菜"),
         OcrItem(name="鸡蛋（mock）", quantity=10, unit="个", unit_price=1.2),

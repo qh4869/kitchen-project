@@ -27,7 +27,6 @@ class PurchaseItemOut(PurchaseItemBase):
 
 class PurchaseBase(BaseModel):
     supplier_id: UUID | None = None
-    total_amount: Decimal | None = Field(None, ge=0)
     purchase_time: datetime | None = None
     notes: str | None = None
 
@@ -38,7 +37,6 @@ class PurchaseCreate(PurchaseBase):
 
 class PurchaseUpdate(BaseModel):
     supplier_id: UUID | None = None
-    total_amount: Decimal | None = Field(None, ge=0)
     purchase_time: datetime | None = None
     notes: str | None = None
     manual_adjustment: bool | None = None
@@ -63,7 +61,6 @@ class PurchaseListItem(BaseModel):
 
     id: UUID
     supplier_id: UUID | None
-    total_amount: Decimal | None
     purchase_time: datetime
     manual_adjustment: bool
     item_count: int

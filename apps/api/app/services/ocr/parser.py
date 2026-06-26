@@ -56,7 +56,6 @@ def parse_llm_json(content: str, *, provider: str, image_key: str) -> OcrResult:
         image_key=image_key,
         supplier_name=obj.get("supplier_name"),
         purchase_time=obj.get("purchase_time"),
-        total_amount=obj.get("total_amount"),
         items=obj.get("items") or [],
         raw_llm_output=obj,
         provider=provider,
