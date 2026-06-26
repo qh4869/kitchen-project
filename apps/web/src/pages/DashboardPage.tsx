@@ -112,7 +112,7 @@ export default function DashboardPage() {
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           {submittedQ === ""
             ? "暂无采购记录。去「记账」添加第一条。"
-            : `未找到 "${submittedQ}" 的采购记录。可以换个关键词，或先去「记账」/「采购记录」录入。`}
+            : `未找到 "${submittedQ}" 的采购记录。可以换个关键词，或去「记账」补录。`}
         </div>
       )}
 
@@ -135,8 +135,8 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.items.map((it, idx) => (
-                  <tr key={`${it.purchase_id}-${idx}`} className="border-t border-slate-100">
+                {data.items.map((it) => (
+                  <tr key={it.purchase_item_id} className="border-t border-slate-100">
                     <td className="px-3 py-1.5">{it.name}</td>
                     <td className="px-3 py-1.5 text-right font-mono tabular-nums">
                       {formatPrice(it.unit_price, it.unit)}
