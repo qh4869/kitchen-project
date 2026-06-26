@@ -129,3 +129,69 @@ async def test_create_validation_error_negative_price(client):
     bad = _Encoder.to_jsonable({"items": [_items(unit_price=Decimal("-1"))]})
     r = await client.post(PURCHASES, json=bad)
     assert r.status_code == 422
+
+
+from uuid import uuid4
+
+
+async def test_update_purchase_replaces_items_when_provided(client):
+    # Create purchase with 2 items
+    r = await client.post(
+        "/api/v1/purchases",
+        json={
+            "items": [
+                {"name": "番茄", "quantity": "1", "unit_price": "5"},
+                {"name": "鸡蛋", "quantity": "10", "unit_price": "1.2"},
+            ],
+        },
+    )
+    purchase_id = r.json()["id"]
+
+    # PUT with 3 new items (different from original)
+    r = await client.put(
+        f"/api/v1/purchases/{purchase_id}",
+        json={
+            "items": [
+                {"name": "番茄", "quantity": "2", "unit_price": "6"},
+                {"name": "黄瓜", "quantity": "1", "unit_price": "3"},
+                {"name": "葱", "quantity": "0.5", "unit_price": "2"},
+            ],
+        },
+    )
+    assert r.status_code == 200, r.text
+    items = r.json()["items"]
+    assert len(items) == 3
+    names = {it["name"] for it in items}
+    assert names == {"番茄", "黄瓜", "葱"}
+    # 鸡蛋 (original) should be gone
+    assert "鸡蛋" not in names
+
+
+async def test_update_purchase_preserves_items_when_omitted(client):
+    r = await client.post(
+        "/api/v1/purchases",
+        json={"items": [{"name": "番茄", "quantity": "1", "unit_price": "5"}]},
+    )
+    purchase_id = r.json()["id"]
+    original_item_id = r.json()["items"][0]["id"]
+
+    # PUT without items key, only updating manual_adjustment
+    r = await client.put(
+        f"/api/v1/purchases/{purchase_id}",
+        json={"manual_adjustment": True},
+    )
+    assert r.status_code == 200, r.text
+    items = r.json()["items"]
+    assert len(items) == 1
+    # Same item preserved (not deleted + recreated)
+    assert items[0]["id"] == original_item_id
+    assert items[0]["name"] == "番茄"
+
+
+async def test_update_purchase_404_on_missing_purchase(client):
+    fake_id = uuid4()
+    r = await client.put(
+        f"/api/v1/purchases/{fake_id}",
+        json={"manual_adjustment": True},
+    )
+    assert r.status_code == 404

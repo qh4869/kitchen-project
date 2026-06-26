@@ -40,6 +40,7 @@ class PurchaseUpdate(BaseModel):
     purchase_time: datetime | None = None
     notes: str | None = None
     manual_adjustment: bool | None = None
+    items: list[PurchaseItemCreate] | None = None
 
 
 class PurchaseOut(PurchaseBase):

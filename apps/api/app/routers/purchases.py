@@ -139,11 +139,30 @@ async def update_purchase(
     )
     if purchase is None:
         raise HTTPException(status_code=404, detail="Purchase not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+
+    payload_dict = payload.model_dump(exclude_unset=True)
+
+    # Update purchase-level fields (everything except items)
+    for field, value in payload_dict.items():
+        if field == "items":
+            continue
         setattr(purchase, field, value)
+
+    # If items explicitly provided, replace the entire items list.
+    # SQLAlchemy's cascade="all, delete-orphan" on Purchase.items relationship
+    # automatically deletes the old items when we assign a new list.
+    if "items" in payload_dict:
+        purchase.items = [
+            PurchaseItem(**item.model_dump()) for item in (payload.items or [])
+        ]
+
     await db.commit()
-    await db.refresh(purchase)
-    return purchase
+    # Re-fetch to ensure items collection is freshly loaded after replace
+    refreshed = await db.get(
+        Purchase, purchase_id, options=[selectinload(Purchase.items)]
+    )
+    assert refreshed is not None
+    return refreshed
 
 
 @router.delete("/{purchase_id}", status_code=status.HTTP_204_NO_CONTENT)
