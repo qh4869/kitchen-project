@@ -33,8 +33,9 @@
 
 | 路径 | 操作 | 内容 |
 |---|---|---|
-| `apps/web/src/App.tsx` | 修改 | 加路由→标题映射；Layout 加 mobile 分支：`<md:` 渲染 MobileShell（顶部栏 + Drawer），`≥md:` 维持现状 |
-| `apps/web/src/components/MobileNav.tsx` | 新建 | 顶部栏 + 抽屉组件；props: `currentPath`，自管 `drawerOpen` state |
+| `apps/web/src/nav-items.ts` | 新建 | 抽出 `navItems` 数组（`{ to, label, end }` 形状），供 `App.tsx` 和 `MobileNav.tsx` 共享，避免重复 |
+| `apps/web/src/App.tsx` | 修改 | 从 `./nav-items` 导入 `navItems`；引入 `MobileNav` + `useLocation`；sidebar 加 `hidden md:block`；main padding 改 `p-4 md:p-6` |
+| `apps/web/src/components/MobileNav.tsx` | 新建 | 顶部栏 + 抽屉组件；从 `../nav-items` 导入 `navItems`；props: `currentPath`，自管 `drawerOpen` state |
 
 ### 3.2 MobileNav 组件结构
 
@@ -50,6 +51,9 @@ const TITLE_MAP: Record<string, string> = {
 export default function MobileNav({ currentPath }: Props) {
   const [open, setOpen] = useState(false);
   const title = TITLE_MAP[currentPath] ?? "";
+
+  // 路由变化时关抽屉（兜底浏览器后退键等非点击导航）
+  useEffect(() => { setOpen(false); }, [currentPath]);
 
   // ESC 关闭 + body 滚动锁
   useEffect(() => {
@@ -110,35 +114,41 @@ export default function MobileNav({ currentPath }: Props) {
 
 ### 3.3 App.tsx 改动
 
+把 `MobileNav` 放在 `flex-row` 容器**外层**（fragment sibling），让 sticky header 在 mobile 下独立占据顶部 42px，下方 `flex-row` 容器里 sidebar `hidden md:block` + main `flex-1`。
+
 ```diff
++ import { useLocation } from "react-router-dom";
++ import MobileNav from "./components/MobileNav";
++
   export default function App() {
 +   const location = useLocation();
     return (
--     <div className="flex min-h-screen">
-+     <div className="flex min-h-screen">
-+       {/* Mobile: 顶部栏（仅 <md 显示） */}
++     <>
++       {/* Mobile: 顶部栏 + 抽屉；内部全部 md:hidden，desktop 下渲染空 fragment */}
 +       <MobileNav currentPath={location.pathname} />
 +
         {/* Desktop: 左侧 sidebar（仅 ≥md 显示） */}
--       <aside className="w-56 shrink-0 border-r border-slate-200 bg-white p-4">
-+       <aside className="hidden md:block w-56 shrink-0 border-r border-slate-200 bg-white p-4">
-          {/* ... 原内容不变 ... */}
-        </aside>
-+       {/* Mobile: 内容区从顶部 42px 下方开始；Desktop: 维持现状 */}
--       <main className="flex-1 overflow-x-hidden p-6">
-+       <main className="flex-1 overflow-x-hidden p-4 md:p-6">
-          {/* ... 路由不变 ... */}
-        </main>
-      </div>
+        <div className="flex min-h-screen">
+-         <aside className="w-56 shrink-0 border-r border-slate-200 bg-white p-4">
++         <aside className="hidden md:block w-56 shrink-0 border-r border-slate-200 bg-white p-4">
+            {/* ... 原内容不变 ... */}
+          </aside>
+-         <main className="flex-1 overflow-x-hidden p-6">
++         {/* Mobile: p-4 更紧凑；Desktop: 维持 p-6 */}
++         <main className="flex-1 overflow-x-hidden p-4 md:p-6">
+            {/* ... 路由不变 ... */}
+          </main>
+        </div>
++     </>
     );
   }
 ```
 
 要点：
+- 用 React fragment 把 `MobileNav` 和原 `flex` 容器平级摆，**不要**把 `MobileNav` 塞进 `flex` 容器内（否则 `<header>` 会变成 flex-row 的横向子项，被推到 sidebar 左边而不是顶部）
 - Desktop sidebar 加 `hidden md:block`（`<md` 时彻底不渲染、不占位）
 - `<main>` 内边距 `p-4 md:p-6`（手机更紧凑）
-- `MobileNav` 内的所有元素都用 `md:hidden` 前缀，`≥md` 时不渲染
-- 因为 flex 容器是 `flex`（默认 `flex-row`），而 MobileNav 的根 `<header>` 是 `sticky`，需要把 MobileNav 放在 flex 容器外层或用 absolute 定位 —— 实现时用「fixed/sticky 顶部栏 + main 加 top padding」更简单，避开 flex 子项的复杂度。具体取舍在 plan 里定。
+- `MobileNav` 内的所有元素都用 `md:hidden` 前缀，`≥md` 时 MobileNav 整体返回 `null`（不渲染任何东西）
 
 ### 3.4 动画 keyframes
 
