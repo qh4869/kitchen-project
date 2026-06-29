@@ -444,11 +444,10 @@ Tap ☰ in the top bar. Confirm:
 - Active page (e.g. "首页" when on `/`) is highlighted emerald
 - Backdrop is dimmed (~45% black); underlying page content is still partially visible to the right of the drawer
 
-Close the drawer four ways, one at a time, reopening between each:
-1. **Tap backdrop** — drawer disappears
+Close the drawer three ways, one at a time, reopening between each:
+1. **Tap backdrop** — drawer disappears. (Also: tapping the spot where ☰ used to be hits the z-50 overlay, not the z-30 ☰ button — so this is what closes the drawer if the user reflexively taps the top-left after opening.)
 2. **Tap a nav item** (e.g. 记账) — drawer closes AND page navigates to `/entry`. Top bar title changes to "记账".
 3. **Press ESC key** — drawer closes
-4. **(Skip "tap ☰ again"** — the ☰ button only opens, doesn't toggle. This matches the spec — `☰` has no `onClick` to close, only `setOpen(true)`. Document if this feels wrong; it's intentional per spec section 2.)
 
 - [ ] **Step 5: Body scroll lock**
 
