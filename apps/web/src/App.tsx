@@ -2,12 +2,7 @@ import { NavLink, Route, Routes } from "react-router-dom";
 import EntryPage from "./pages/EntryPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import DashboardPage from "./pages/DashboardPage";
-
-const navItems = [
-  { to: "/", label: "首页", end: true, page: "dashboard" },
-  { to: "/entry", label: "记账", end: false, page: "entry" },
-  { to: "/suppliers", label: "供应商", end: false, page: "suppliers" },
-];
+import { navItems } from "./nav-items";
 
 export default function App() {
   return (
